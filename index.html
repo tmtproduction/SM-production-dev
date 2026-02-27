@@ -2267,7 +2267,7 @@
       // ======================================================
       // ตั้งค่า URL ของ GAS Web App ที่นี่
       // ======================================================
-      const GAS_URL = "https://script.google.com/macros/s/AKfycbwcZesY-cNsIkfIIBhFIh4l1GHUyIo3rEKXjv2V3qCa594wqG7pve06I7mRrn74taoZ/exec";
+      const GAS_URL = "https://script.google.com/macros/s/AKfycbyHgWWLbIt0n7BUmGvZSLBbeuQjQJ0GXZ4QaUuBSyFSgQkkvUpCYPPC_3SkoOBz53jh/exec";
 
       // Fix: aria-hidden บน focused element — blur ก่อน modal ซ่อน
       document.addEventListener('hide.bs.modal', function(e) {
@@ -6028,11 +6028,96 @@ function updateLegendDisplay(index, log) {
             if (stripInput) stripInput.value = '';
         }
 
+
+        // ────────────────────────────────────────────
+        // THK PROFILE FAB
+        // ────────────────────────────────────────────
+        
+        // ✅ อยู่ repo เดียวกัน — ใช้ relative path ได้เลย
+        // ถ้าตั้งชื่อไฟล์ต่างออกไป ให้เปลี่ยน 'thk-profile.html' ให้ตรง
+        const THK_PROFILE_URL = './thk-profile.html';
+        
+        // แสดง/ซ่อน FAB ตามหน้าที่ active
+        // เรียกใช้ต่อจาก switchScreen() ที่มีอยู่แล้ว
+        (function patchSwitchScreen() {
+          const _orig = typeof switchScreen === 'function' ? switchScreen : null;
+          window.switchScreen = function(id) {
+            if (_orig) _orig(id);
+            // แสดง FAB เฉพาะหน้า Home (screen-select) และ Queue (screen-queue)
+            const showFab = (id === 'screen-select' || id === 'screen-queue');
+            document.getElementById('fab-thk').style.display = showFab ? 'block' : 'none';
+          };
+          // ตอน load: ถ้า screen-select active อยู่แล้ว ให้แสดง FAB เลย
+          if (document.getElementById('screen-select')?.classList.contains('active-screen')) {
+            document.getElementById('fab-thk').style.display = 'block';
+          }
+        })();
+        
+        // เปิด Thk Profile — ส่ง URL params ถ้ามี job ที่กำลัง running อยู่
+        function openThkProfile() {
+          const params = new URLSearchParams({ mode: 'new' });
+        
+          // ถ้าอยู่หน้า Queue มี job ที่เลือกไว้ ให้ส่ง jobId + spec ไปด้วย
+          if (typeof currentJob !== 'undefined' && currentJob) {
+            if (currentJob.jobId)    params.set('jobId',  currentJob.jobId);
+            if (currentJob.thickness) {
+              params.set('target', currentJob.thickness);
+              // ดึง spec max/min จาก standards ถ้ามี
+              if (typeof appData !== 'undefined' && appData.standards) {
+                const std = appData.standards.find(s => Math.abs(Number(s.thick) - Number(currentJob.thickness)) < 0.001);
+                if (std) {
+                  if (std.max) params.set('max', std.max);
+                  if (std.min) params.set('min', std.min);
+                }
+              }
+            }
+          }
+        
+          window.open(THK_PROFILE_URL + '?' + params.toString(), '_blank');
+        }      
+
     </script>
 
     <div id="toast-container" style="position:fixed; top:20px; right:20px; z-index:10000;"></div>
+    
+<!-- ── FAB: Thickness Profile ── -->
+<div id="fab-thk" style="
+  display: none;
+  position: fixed;
+  bottom: 24px;
+  right: 20px;
+  z-index: 1000;
+">
+  <button onclick="openThkProfile()"
+    title="วัดความหนาม้วน"
+    style="
+      background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
+      color: white;
+      border: none;
+      border-radius: 50px;
+      padding: 13px 20px;
+      font-family: 'Sarabun', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(99,102,241,0.45);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.15s, box-shadow 0.15s;
+      white-space: nowrap;
+    "
+    onmousedown="this.style.transform='scale(0.96)'"
+    onmouseup="this.style.transform='scale(1)'"
+    ontouchstart="this.style.transform='scale(0.96)'"
+    ontouchend="this.style.transform='scale(1)'"
+  >
+    <span style="font-size:17px;">📏</span> วัดความหนา
+  </button>
+</div>
 
   </body>
 </html>
+
 
 
