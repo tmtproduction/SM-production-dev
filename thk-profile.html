@@ -817,6 +817,24 @@ canvas#profileCanvas { display: block; cursor: crosshair; }
     <span class="filter-chip chip-fail" data-filter="FAIL" onclick="setFilterChip('FAIL')">❌ FAIL</span>
     <span class="filter-chip" data-filter="today" onclick="setFilterChip('today')">วันนี้</span>
     <span class="filter-chip" data-filter="week"  onclick="setFilterChip('week')">สัปดาห์นี้</span>
+    <span class="filter-chip" data-filter="adv"   onclick="setFilterChip('adv')" id="chip-adv">⚙ ความหนา/กว้าง</span>
+  </div>
+
+  <!-- Advanced filter row -->
+  <div id="advanced-filter-row" style="display:none; padding:8px 16px 10px; background:var(--panel); border-bottom:1px solid var(--border); gap:8px; flex-wrap:wrap; align-items:flex-end;">
+    <div style="flex:1; min-width:100px;">
+      <label class="setup-label">ความหนา (mm)</label>
+      <select class="setup-select" id="filter-target" onchange="onFilterChange()" style="font-size:13px;">
+        <option value="">— ทั้งหมด —</option>
+      </select>
+    </div>
+    <div style="flex:1; min-width:100px;">
+      <label class="setup-label">หน้ากว้าง (mm)</label>
+      <select class="setup-select" id="filter-width" onchange="onFilterChange()" style="font-size:13px;">
+        <option value="">— ทั้งหมด —</option>
+      </select>
+    </div>
+    <button onclick="resetAdvancedFilter()" style="background:transparent; border:none; color:var(--muted); font-size:12px; cursor:pointer; padding:4px 8px; white-space:nowrap; align-self:flex-end;">✕ ล้างตัวกรอง</button>
   </div>
 
   <div class="history-list" id="history-list">
@@ -1431,9 +1449,14 @@ function saveToGAS() {
   const urlParams = new URLSearchParams(window.location.search);
   const jobId     = selectedJob?.parentId || urlParams.get('jobId') || '';
 
+  // ดึง width จาก selectedJob หรือ URL params
+  const urlWidth = new URLSearchParams(window.location.search).get('width') || '';
+  const slitWidth = selectedJob?.width || parseFloat(urlWidth) || 0;
+
   const payload = {
     coilId,
     jobId,
+    width:      slitWidth,
     specMax:    specMax    || null,
     specMin:    specMin    || null,
     specTarget: specTarget || null,
@@ -1441,6 +1464,7 @@ function saveToGAS() {
     interval:   parseInt(document.getElementById('interval-mode').value) || 100,
     passRate:   getCurrentPassRate(),
     status:     getCurrentStatus(),
+    // เก็บ width ใน rows metadata ด้วย เพื่อให้ดึงกลับมาได้
     rows:       rows.map(r => ({ pos: r.pos, vals: r.vals })),
     savedAt:    new Date().toISOString()
   };
@@ -1493,6 +1517,8 @@ function exportCSV() {
 let _historyAll    = [];   // raw data from GAS
 let _historyFilter = 'all'; // current chip filter
 let _histSearchQ   = '';
+let _filterWidth   = '';   // กรองหน้ากว้าง
+let _filterTarget  = '';   // กรองความหนา
 
 function onHistSearchInput(val) {
   _histSearchQ = val.trim();
@@ -1535,14 +1561,24 @@ function showSuggestions(q) {
   const seen = new Set();
   const matches = [];
   _historyAll.forEach(p => {
-    const coil = p.coilId || '';
-    const job  = p.jobId  || '';
+    const coil   = p.coilId || '';
+    const job    = p.jobId  || '';
+    const target = String(p.target || '');
+    const width  = String(p.width  || '');
+
     if (coil.toLowerCase().includes(ql) && !seen.has(coil)) {
       seen.add(coil);
-      matches.push({ label: coil, sub: job ? 'Job: ' + job : '', icon: '🪄', type: 'coil' });
+      const extra = [job ? 'Job: '+job : '', width ? width+'mm' : '', target ? target+'mm' : ''].filter(Boolean).join(' · ');
+      matches.push({ label: coil, sub: extra, icon: '🪄', type: 'coil' });
     } else if (job.toLowerCase().includes(ql) && !seen.has('J:'+job)) {
       seen.add('J:'+job);
       matches.push({ label: job, sub: 'Job ID', icon: '📋', type: 'job' });
+    } else if (target.includes(ql) && !seen.has('T:'+target)) {
+      seen.add('T:'+target);
+      matches.push({ label: target, sub: 'ความหนา (mm)', icon: '📏', type: 'target' });
+    } else if (width.includes(ql) && !seen.has('W:'+width)) {
+      seen.add('W:'+width);
+      matches.push({ label: width, sub: 'หน้ากว้าง (mm)', icon: '↔️', type: 'width' });
     }
   });
 
@@ -1569,11 +1605,30 @@ function highlightMatch(text, q) {
 
 function selectSuggest(val, type) {
   const inp = document.getElementById('hist-filter-id');
-  inp.value = val;
-  _histSearchQ = val;
-  document.getElementById('btn-clear-search')?.classList.add('show');
   hideSuggestions();
   inp.blur();
+
+  if (type === 'target') {
+    // เปิด advanced filter และตั้งค่า target
+    setFilterChip('adv');
+    const sel = document.getElementById('filter-target');
+    if (sel) { sel.value = val; _filterTarget = val; }
+    inp.value = '';
+    _histSearchQ = '';
+    document.getElementById('btn-clear-search')?.classList.remove('show');
+  } else if (type === 'width') {
+    // เปิด advanced filter และตั้งค่า width
+    setFilterChip('adv');
+    const sel = document.getElementById('filter-width');
+    if (sel) { sel.value = val; _filterWidth = val; }
+    inp.value = '';
+    _histSearchQ = '';
+    document.getElementById('btn-clear-search')?.classList.remove('show');
+  } else {
+    inp.value = val;
+    _histSearchQ = val;
+    document.getElementById('btn-clear-search')?.classList.add('show');
+  }
   renderHistoryList();
 }
 
@@ -1591,7 +1646,44 @@ function setFilterChip(filter) {
   document.querySelectorAll('.filter-chip').forEach(el => {
     el.classList.toggle('active', el.dataset.filter === filter);
   });
+  // แสดง/ซ่อน advanced filter row
+  const advRow = document.getElementById('advanced-filter-row');
+  if (advRow) advRow.style.display = filter === 'adv' ? 'flex' : 'none';
   renderHistoryList();
+}
+
+function onFilterChange() {
+  _filterTarget = document.getElementById('filter-target')?.value || '';
+  _filterWidth  = document.getElementById('filter-width')?.value  || '';
+  renderHistoryList();
+}
+
+function resetAdvancedFilter() {
+  _filterTarget = '';
+  _filterWidth  = '';
+  const selT = document.getElementById('filter-target');
+  const selW = document.getElementById('filter-width');
+  if (selT) selT.value = '';
+  if (selW) selW.value = '';
+  renderHistoryList();
+}
+
+// สร้าง unique options จากข้อมูลที่โหลดมา
+function buildFilterOptions() {
+  const targets = [...new Set(_historyAll.map(p => p.target).filter(v => v > 0))].sort((a,b) => a-b);
+  const widths  = [...new Set(_historyAll.map(p => p.width).filter(v => v > 0))].sort((a,b) => a-b);
+
+  const selT = document.getElementById('filter-target');
+  const selW = document.getElementById('filter-width');
+  if (!selT || !selW) return;
+
+  const curT = selT.value;
+  const curW = selW.value;
+
+  selT.innerHTML = '<option value="">— ทั้งหมด —</option>'
+    + targets.map(v => `<option value="${v}" ${curT==v?'selected':''}>${v} mm</option>`).join('');
+  selW.innerHTML = '<option value="">— ทั้งหมด —</option>'
+    + widths.map(v => `<option value="${v}" ${curW==v?'selected':''}>${v} mm</option>`).join('');
 }
 
 function loadHistory(filterJobId) {
@@ -1618,6 +1710,7 @@ function loadHistory(filterJobId) {
         el.innerHTML = `<div class="history-empty">ยังไม่มีข้อมูลที่บันทึกไว้</div>`;
         return;
       }
+      buildFilterOptions();
       renderHistoryList();
       toast(`✅ โหลด ${_historyAll.length} รายการ`, 'ok');
     })
@@ -1632,7 +1725,7 @@ function renderHistoryList() {
   const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
 
   let list = _historyAll.filter(p => {
-    // text search
+    // text search (coilId, jobId)
     if (_histSearchQ) {
       const q = _histSearchQ.toLowerCase();
       if (!p.coilId.toLowerCase().includes(q) && !p.jobId.toLowerCase().includes(q)) return false;
@@ -1649,6 +1742,10 @@ function renderHistoryList() {
       const d = parseThaiDate(p.timestamp);
       if (!d || d < weekAgo) return false;
     }
+    // advanced filter — ความหนา
+    if (_filterTarget && parseFloat(p.target) !== parseFloat(_filterTarget)) return false;
+    // advanced filter — หน้ากว้าง
+    if (_filterWidth  && parseFloat(p.width)  !== parseFloat(_filterWidth))  return false;
     return true;
   });
 
@@ -1685,6 +1782,7 @@ function renderHistoryList() {
               <span class="history-chip ${stClass}">${p.status||'—'}</span>
               <span class="history-chip">${p.passRate}%</span>
               <span class="history-chip">${p.target} mm</span>
+              ${p.width ? `<span class="history-chip">${p.width} mm กว้าง</span>` : ''}
               <span class="history-chip">${p.rows?.length||0} จุด</span>
             </div>
             <span class="history-arrow">›</span>
@@ -1731,6 +1829,10 @@ function openSheet(idx) {
       <div class="sheet-meta-card">
         <div class="sheet-meta-label">Spec</div>
         <div class="sheet-meta-val" style="font-size:12px;">${p.specMin} – ${p.specMax}</div>
+      </div>
+      <div class="sheet-meta-card">
+        <div class="sheet-meta-label">หน้ากว้าง</div>
+        <div class="sheet-meta-val">${p.width ? p.width + ' mm' : '—'}</div>
       </div>
       <div class="sheet-meta-card">
         <div class="sheet-meta-label">จำนวนจุดวัด</div>
