@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Thickness Profile</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #0a0e14;
+  --panel:   #111620;
+  --surface: #1a2030;
+  --border:  #253048;
+  --text:    #cdd6f4;
+  --muted:   #6c7a9c;
+  --accent:  #89dceb;
+  --yellow:  #f9e2af;
+  --green:   #a6e3a1;
+  --red:     #f38ba8;
+  --orange:  #fab387;
+  --mono:    'IBM Plex Mono', monospace;
+  --sans:    'Sarabun', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ─── HEADER ─── */
+.header {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.header-left { display: flex; align-items: center; gap: 10px; }
+.header-icon {
+  width: 34px; height: 34px;
+  background: linear-gradient(135deg, #89dceb44, #89dceb22);
+  border: 1px solid #89dceb55;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px;
+}
+.header-title { font-weight: 700; font-size: 15px; }
+.header-sub { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+
+/* ─── MAIN TABS ─── */
+.main-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 12px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.main-tab {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+  flex: 1;
+  text-align: center;
+}
+.main-tab.active {
+  background: var(--accent);
+  color: #0a0e14;
+  border-color: var(--accent);
+}
+
+/* ─── SETUP PANEL ─── */
+.setup-panel {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 16px;
+}
+.setup-row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.setup-field { flex: 1; min-width: 90px; }
+.setup-label {
+  font-size: 10px; font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 5px;
+  display: block;
+}
+.setup-input, .setup-select {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 8px 10px;
+  outline: none;
+  transition: border-color 0.15s;
+  -webkit-appearance: none;
+}
+.setup-input:focus, .setup-select:focus { border-color: var(--accent); }
+.setup-select option { background: var(--surface); }
+.btn-generate {
+  background: var(--accent);
+  color: #0a0e14;
+  border: none;
+  border-radius: 8px;
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 8px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s;
+  height: 36px;
+}
+.btn-generate:active { opacity: 0.8; }
+
+/* auto-filled badge */
+.auto-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 10px; color: var(--accent);
+  background: rgba(137,220,235,0.1);
+  border: 1px solid rgba(137,220,235,0.25);
+  border-radius: 10px; padding: 2px 8px;
+  margin-left: 6px;
+}
+
+/* spec hint row */
+.spec-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.spec-badge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: var(--mono);
+}
+.spec-dot { width: 7px; height: 7px; border-radius: 50%; }
+
+/* ─── MAIN CONTENT ─── */
+.main { padding: 16px; }
+
+/* ─── COIL VISUAL ─── */
+.coil-visual-wrap {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.visual-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 12px;
+}
+.coil-scroll-wrap {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  padding-bottom: 4px;
+}
+.coil-scroll-wrap::-webkit-scrollbar { height: 4px; }
+.coil-scroll-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+canvas#profileCanvas { display: block; cursor: crosshair; }
+
+/* ─── MEASUREMENT POINT LEGEND ─── */
+.pt-legend { display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+.pt-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+.pt-legend-line { width: 20px; height: 2px; border-radius: 1px; }
+
+/* ─── DATA TABLE ─── */
+.table-wrap {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+.table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.table-title { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+.btn-add-row {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--accent);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.btn-add-row:hover { border-color: var(--accent); }
+
+.data-table { width: 100%; border-collapse: collapse; min-width: 360px; }
+.data-table th {
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 8px 10px;
+  text-align: center;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+}
+.data-table td { padding: 5px 6px; border-bottom: 1px solid var(--border); text-align: center; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:hover td { background: var(--surface); }
+
+.cell-pos { font-family: var(--mono); font-size: 12px; font-weight: 600; color: var(--muted); }
+.thk-cell {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  padding: 5px 4px;
+  text-align: center;
+  width: 72px;
+  outline: none;
+  transition: border-color 0.12s, background 0.12s;
+}
+.thk-cell:focus { border-color: var(--accent); }
+.thk-cell.val-pass { border-color: var(--green); background: #a6e3a108; color: var(--green); }
+.thk-cell.val-fail { border-color: var(--red);   background: #f38ba808; color: var(--red); }
+.thk-cell.val-warn { border-color: var(--orange); background: #fab38708; color: var(--orange); }
+
+.avg-chip { font-family: var(--mono); font-size: 12px; padding: 3px 8px; border-radius: 6px; background: var(--surface); border: 1px solid var(--border); }
+.avg-pass { border-color: var(--green); color: var(--green); }
+.avg-fail { border-color: var(--red);   color: var(--red); }
+.avg-warn { border-color: var(--orange); color: var(--orange); }
+
+.btn-del-row { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; padding: 4px 6px; border-radius: 4px; transition: color 0.15s; }
+.btn-del-row:hover { color: var(--red); }
+
+.pos-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  width: 56px;
+  text-align: center;
+  outline: none;
+  padding: 2px 0;
+}
+.pos-input:focus { border-color: var(--accent); color: var(--text); }
+
+/* ─── STATS PANEL ─── */
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+.stat-card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+.stat-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 4px; }
+.stat-val { font-family: var(--mono); font-size: 1.5rem; font-weight: 600; line-height: 1; }
+.stat-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+.stat-pass { color: var(--green); }
+.stat-fail { color: var(--red); }
+.stat-warn { color: var(--orange); }
+.stat-accent { color: var(--accent); }
+
+/* ─── EXPORT / ACTION ─── */
+.action-row { display: flex; gap: 8px; margin-bottom: 24px; }
+.btn-action {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 11px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition: border-color 0.15s;
+}
+.btn-action:hover { border-color: var(--accent); color: var(--accent); }
+.btn-action.primary { background: var(--accent); color: #0a0e14; border-color: var(--accent); }
+.btn-action.primary:hover { opacity: 0.9; color: #0a0e14; }
+.btn-action:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ─── HISTORY SCREEN ─── */
+#screen-history { display: none; }
+.history-filter {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.history-list { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.history-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.history-card:hover { border-color: var(--accent); }
+.history-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+.history-coil-id { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--accent); }
+.history-ts { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+.history-meta { display: flex; gap: 10px; flex-wrap: wrap; }
+.history-chip {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.st-pass { border-color: var(--green); color: var(--green); }
+.st-fail { border-color: var(--red);   color: var(--red); }
+.st-warn { border-color: var(--orange); color: var(--orange); }
+.history-empty { text-align: center; padding: 48px 16px; color: var(--muted); font-size: 13px; }
+
+/* ─── TOOLTIP ─── */
+#tooltip {
+  position: fixed;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 200;
+  display: none;
+  white-space: nowrap;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+}
+
+/* ─── TOAST ─── */
+.toast-wrap { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 999; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.toast {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 18px;
+  font-size: 13px;
+  display: flex; align-items: center; gap: 7px;
+  animation: toastIn 0.25s ease;
+  white-space: nowrap;
+}
+.toast.ok  { border-color: var(--green); color: var(--green); }
+.toast.err { border-color: var(--red);   color: var(--red); }
+@keyframes toastIn { from { opacity:0; transform: translateY(10px); } to { opacity:1; transform: translateY(0); } }
+
+/* ─── MODE TABS ─── */
+.mode-tab { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-family: var(--sans); font-size: 12px; font-weight: 600; padding: 6px 14px; cursor: pointer; transition: all 0.15s; }
+.mode-tab.active { background: var(--accent); color: #0a0e14; border-color: var(--accent); }
+
+/* ─── PASS BAR ─── */
+.pass-bar-wrap { height: 6px; background: var(--surface); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.pass-bar { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+
+/* ─── LOADING SPINNER ─── */
+.spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <div class="header-icon">📏</div>
+    <div>
+      <div class="header-title">Thickness Profile</div>
+      <div class="header-sub">COIL QC MAPPER</div>
+    </div>
+  </div>
+  <div style="font-family:var(--mono); font-size:11px; color:var(--muted);" id="header-coil-id">—</div>
+</div>
+
+<!-- MAIN TABS: NEW / HISTORY -->
+<div class="main-tabs">
+  <button class="main-tab active" id="tab-new"     onclick="switchMainTab('new')">📝 บันทึกใหม่</button>
+  <button class="main-tab"        id="tab-history" onclick="switchMainTab('history')">📂 ประวัติ</button>
+</div>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- SCREEN: NEW -->
+<!-- ══════════════════════════════════════════════════ -->
+<div id="screen-new">
+
+  <!-- SETUP PANEL -->
+  <div class="setup-panel">
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:10px;">
+      <button class="mode-tab active" id="mode-link"   onclick="setMode('link')">🔗 ดึงจาก SM Production</button>
+      <button class="mode-tab"        id="mode-manual" onclick="setMode('manual')">✏️ กรอกเอง</button>
+    </div>
+
+    <!-- Mode A: Link -->
+    <div id="panel-link">
+      <div class="setup-row" style="margin-bottom:8px;">
+        <div class="setup-field">
+          <label class="setup-label">ค้นหา Job ID หรือ Slit ID</label>
+          <div style="position:relative;">
+            <input class="setup-input" id="job-search" placeholder="พิมพ์ Job ID เช่น J001..." oninput="searchJobs(this.value)" autocomplete="off">
+            <div id="job-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--surface); border:1px solid var(--border); border-radius:8px; z-index:99; max-height:160px; overflow-y:auto; margin-top:4px; box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
+          </div>
+        </div>
+        <button class="btn-generate" onclick="loadFromGAS()">⬇ โหลด</button>
+      </div>
+      <div id="selected-job-card" style="display:none; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 14px; margin-bottom:10px; flex-wrap:wrap; gap:10px;"></div>
+    </div>
+
+    <!-- Mode B: Manual -->
+    <div id="panel-manual" style="display:none;">
+      <div class="setup-row" style="margin-bottom:8px;">
+        <div class="setup-field">
+          <label class="setup-label">Coil / Slit ID</label>
+          <input class="setup-input" id="coil-id" placeholder="เช่น J001-SA-S1">
+        </div>
+        <div class="setup-field" style="max-width:100px;">
+          <label class="setup-label">ความยาว (m)</label>
+          <input class="setup-input" id="coil-length" type="number" placeholder="1200" value="1200">
+        </div>
+        <button class="btn-generate" onclick="generateTable()">▶ สร้าง</button>
+      </div>
+    </div>
+
+    <!-- Common spec + interval -->
+    <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; margin-top:4px;">
+      <div class="setup-field" style="max-width:88px;">
+        <label class="setup-label">ระยะห่าง</label>
+        <select class="setup-select" id="interval-mode">
+          <option value="100">100 m</option>
+          <option value="50">50 m</option>
+          <option value="200">200 m</option>
+          <option value="custom">เพิ่มเอง</option>
+        </select>
+      </div>
+      <div class="setup-field" style="max-width:76px;">
+        <label class="setup-label">จุดวัด/ตำแหน่ง</label>
+        <select class="setup-select" id="pt-count">
+          <option value="3">3 จุด</option>
+          <option value="5">5 จุด</option>
+        </select>
+      </div>
+      <div class="setup-field" style="max-width:88px;">
+        <label class="setup-label">Target (mm)</label>
+        <input class="setup-input" id="spec-target" type="number" step="0.001" placeholder="1.400" oninput="revalidateAll()">
+      </div>
+      <div class="setup-field" style="max-width:88px;">
+        <label class="setup-label">MAX (mm)</label>
+        <input class="setup-input" id="spec-max" type="number" step="0.001" placeholder="1.540" oninput="revalidateAll()">
+      </div>
+      <div class="setup-field" style="max-width:88px;">
+        <label class="setup-label">MIN (mm)</label>
+        <input class="setup-input" id="spec-min" type="number" step="0.001" placeholder="1.260" oninput="revalidateAll()">
+      </div>
+    </div>
+
+    <div id="auto-fill-notice" style="display:none; margin-top:8px; font-size:11px; color:var(--accent);">
+      ✅ ดึงข้อมูลจาก SM Production อัตโนมัติ
+      <span class="auto-badge">Auto-filled</span>
+    </div>
+
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px;">
+      <span class="spec-badge"><span class="spec-dot" style="background:var(--green)"></span>Pass</span>
+      <span class="spec-badge"><span class="spec-dot" style="background:var(--orange)"></span>ใกล้ขอบ</span>
+      <span class="spec-badge"><span class="spec-dot" style="background:var(--red)"></span>เกิน Spec</span>
+    </div>
+  </div>
+
+  <!-- MAIN AREA -->
+  <div class="main">
+    <!-- CANVAS -->
+    <div class="coil-visual-wrap" id="canvas-section" style="display:none;">
+      <div class="visual-title">📈 Thickness Profile — ตามแนวความยาวม้วน</div>
+      <div class="coil-scroll-wrap">
+        <canvas id="profileCanvas" height="180"></canvas>
+      </div>
+      <div class="pt-legend" id="pt-legend"></div>
+    </div>
+
+    <!-- STATS -->
+    <div class="stats-grid" id="stats-section" style="display:none;">
+      <div class="stat-card">
+        <div class="stat-label">Average (C)</div>
+        <div class="stat-val stat-accent" id="stat-avg">—</div>
+        <div class="stat-sub">ค่าเฉลี่ยจุดกลาง</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Max Deviation</div>
+        <div class="stat-val" id="stat-dev">—</div>
+        <div class="stat-sub">เบี่ยงเบนสูงสุด</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Pass Rate</div>
+        <div class="stat-val stat-pass" id="stat-pass-rate">—</div>
+        <div class="pass-bar-wrap"><div class="pass-bar" id="pass-bar" style="background:var(--green);width:0%"></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Status</div>
+        <div class="stat-val" id="stat-status">—</div>
+        <div class="stat-sub" id="stat-status-sub">กรอกข้อมูลก่อน</div>
+      </div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-wrap" id="table-section" style="display:none;">
+      <div class="table-header">
+        <div class="table-title">📋 ตารางบันทึกความหนา</div>
+        <button class="btn-add-row" onclick="addRow()">+ เพิ่มจุด</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="data-table" id="data-table">
+          <thead id="table-head"></thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div class="action-row" id="action-row" style="display:none;">
+      <button class="btn-action" onclick="exportCSV()">⬇ Export CSV</button>
+      <button class="btn-action primary" id="btn-save-gas" onclick="saveToGAS()">☁ บันทึกไป GAS</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════ -->
+<!-- SCREEN: HISTORY -->
+<!-- ══════════════════════════════════════════════════ -->
+<div id="screen-history" style="display:none;">
+  <div class="history-filter">
+    <div class="setup-field">
+      <label class="setup-label">กรอง Job ID / Slit ID</label>
+      <input class="setup-input" id="hist-filter-id" placeholder="ว่าง = ทั้งหมด">
+    </div>
+    <button class="btn-generate" onclick="loadHistory()">🔍 ค้นหา</button>
+    <button class="btn-generate" style="background:var(--surface); color:var(--text); border:1px solid var(--border);" onclick="loadHistory('')">↺ ทั้งหมด</button>
+  </div>
+  <div class="history-list" id="history-list">
+    <div class="history-empty">กด "ค้นหา" เพื่อโหลดประวัติ</div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// CONFIG
+// ══════════════════════════════════════════════════════════════
+// ⚠️ ให้ใช้ GAS URL เดียวกับ SM Production App
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwcZesY-cNsIkfIIBhFIh4l1GHUyIo3rEKXjv2V3qCa594wqG7pve06I7mRrn74taoZ/exec';
+
+// ══════════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════════
+let rows    = [];
+let ptCount = 3;
+let specMax, specMin, specTarget;
+
+const PT_COLORS   = ['#89dceb','#a6e3a1','#f9e2af','#cba6f7','#fab387'];
+const PT_LABELS_3 = ['L (ซ้าย)','C (กลาง)','R (ขวา)'];
+const PT_LABELS_5 = ['L','LC','C','CR','R'];
+function getPtLabels() { return ptCount === 5 ? PT_LABELS_5 : PT_LABELS_3; }
+
+// ══════════════════════════════════════════════════════════════
+// INIT — อ่าน URL params อัตโนมัติ
+// ══════════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  const p = new URLSearchParams(window.location.search);
+
+  const mode = p.get('mode') || 'new';
+  if (mode === 'history') {
+    switchMainTab('history');
+    const jobId = p.get('jobId') || '';
+    if (jobId) document.getElementById('hist-filter-id').value = jobId;
+    loadHistory(jobId);
+    return;
+  }
+
+  // mode = new
+  const jobId  = p.get('jobId')  || '';
+  const target = p.get('target') || '';
+  const max    = p.get('max')    || '';
+  const min    = p.get('min')    || '';
+  const length = p.get('length') || '';
+
+  let autoFilled = false;
+
+  if (jobId) {
+    document.getElementById('job-search').value = jobId;
+    document.getElementById('header-coil-id').textContent = jobId;
+    autoFilled = true;
+  }
+  if (target) { document.getElementById('spec-target').value = target; autoFilled = true; }
+  if (max)    { document.getElementById('spec-max').value    = max;    autoFilled = true; }
+  if (min)    { document.getElementById('spec-min').value    = min;    autoFilled = true; }
+
+  if (autoFilled) {
+    document.getElementById('auto-fill-notice').style.display = 'block';
+    // ถ้ามี length ให้ auto-generate table ทันที
+    if (length && jobId) {
+      setMode('manual');
+      document.getElementById('coil-id').value     = jobId;
+      document.getElementById('coil-length').value = length;
+      generateTable();
+      setMode('link'); // กลับ mode เป็น link
+    }
+  }
+
+  setMode('link');
+});
+
+window.addEventListener('resize', () => { if (rows.length) renderCanvas(); });
+
+// ══════════════════════════════════════════════════════════════
+// MAIN TAB SWITCHING
+// ══════════════════════════════════════════════════════════════
+function switchMainTab(tab) {
+  document.getElementById('screen-new').style.display     = tab === 'new'     ? '' : 'none';
+  document.getElementById('screen-history').style.display = tab === 'history' ? '' : 'none';
+  document.getElementById('tab-new').classList.toggle('active',     tab === 'new');
+  document.getElementById('tab-history').classList.toggle('active', tab === 'history');
+}
+
+// ══════════════════════════════════════════════════════════════
+// MODE (link / manual)
+// ══════════════════════════════════════════════════════════════
+let currentMode = 'link';
+let selectedJob = null;
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('mode-link').classList.toggle('active',   mode === 'link');
+  document.getElementById('mode-manual').classList.toggle('active', mode === 'manual');
+  document.getElementById('panel-link').style.display   = mode === 'link'   ? '' : 'none';
+  document.getElementById('panel-manual').style.display = mode === 'manual' ? '' : 'none';
+}
+
+// ══════════════════════════════════════════════════════════════
+// GAS HELPER
+// ══════════════════════════════════════════════════════════════
+function callGAS(action, args) {
+  return fetch(GAS_URL, {
+    method:  'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body:    JSON.stringify({ action, args }),
+    credentials: 'omit'
+  }).then(r => r.json());
+}
+
+// ══════════════════════════════════════════════════════════════
+// LOAD SLIT LIST FROM GAS
+// ══════════════════════════════════════════════════════════════
+let allSlits = [];
+
+function loadFromGAS() {
+  const q = document.getElementById('job-search').value.trim();
+  if (!q) { toast('⚠️ กรุณาพิมพ์ Job ID หรือ Slit ID ก่อน', 'err'); return; }
+  if (allSlits.length) { searchJobs(q); return; }
+
+  toast('⏳ กำลังโหลดข้อมูลจาก SM Production...', 'ok');
+  callGAS('getSlitInventory', [])
+    .then(d => {
+      const data = d.result;
+      allSlits = Array.isArray(data) ? data : (data?.slits || []);
+      if (!allSlits.length) toast('⚠️ ไม่พบข้อมูล Slit_Inventory', 'err');
+      else { toast(`✅ โหลด ${allSlits.length} ม้วน`, 'ok'); searchJobs(q); }
+    })
+    .catch(() => toast('⚠️ เชื่อมต่อ GAS ไม่ได้ — ใช้ "กรอกเอง" แทน', 'err'));
+}
+
+function searchJobs(q) {
+  const dd = document.getElementById('job-dropdown');
+  if (!q || q.length < 2) { dd.style.display = 'none'; return; }
+  const matches = allSlits.filter(s =>
+    s.slitId.toLowerCase().includes(q.toLowerCase()) ||
+    (s.parentId||'').toLowerCase().includes(q.toLowerCase())
+  ).slice(0, 8);
+
+  if (!matches.length) { dd.style.display = 'none'; return; }
+  dd.innerHTML = matches.map(s => `
+    <div onclick="selectSlit('${s.slitId}')" style="padding:10px 14px; cursor:pointer; border-bottom:1px solid var(--border); transition:background 0.1s;"
+      onmouseover="this.style.background='var(--panel)'" onmouseout="this.style.background=''">
+      <div style="font-family:var(--mono);font-size:13px;color:var(--accent);">${s.slitId}</div>
+      <div style="font-size:11px;color:var(--muted);">
+        Job: ${s.parentId||'—'} · ${s.width||'—'}mm · ${s.thkC||s.thkL||'—'}mm · ${s.length||'—'}m
+      </div>
+    </div>`).join('');
+  dd.style.display = 'block';
+}
+
+function selectSlit(slitId) {
+  selectedJob = allSlits.find(s => s.slitId === slitId);
+  if (!selectedJob) return;
+  document.getElementById('job-search').value = slitId;
+  document.getElementById('job-dropdown').style.display = 'none';
+
+  if (selectedJob.specMax)    document.getElementById('spec-max').value    = selectedJob.specMax;
+  if (selectedJob.specMin)    document.getElementById('spec-min').value    = selectedJob.specMin;
+  if (selectedJob.thkC)       document.getElementById('spec-target').value = selectedJob.thkC;
+
+  const card = document.getElementById('selected-job-card');
+  card.style.display = 'flex';
+  card.innerHTML = `
+    <div><div style="font-size:10px;color:var(--muted)">SLIT ID</div><div style="font-family:var(--mono);color:var(--accent);font-weight:600;">${selectedJob.slitId}</div></div>
+    <div><div style="font-size:10px;color:var(--muted)">JOB</div><div style="font-family:var(--mono);">${selectedJob.parentId||'—'}</div></div>
+    <div><div style="font-size:10px;color:var(--muted)">ความกว้าง</div><div style="font-family:var(--mono);">${selectedJob.width||'—'} mm</div></div>
+    <div><div style="font-size:10px;color:var(--muted)">ความหนา (C)</div><div style="font-family:var(--mono);">${selectedJob.thkC||selectedJob.thkL||'—'} mm</div></div>
+    <div><div style="font-size:10px;color:var(--muted)">ความยาว</div><div style="font-family:var(--mono);">${selectedJob.length||'—'} m</div></div>
+    <button onclick="startMeasure()" style="margin-left:auto; background:var(--accent); border:none; border-radius:8px; color:#0a0e14; font-weight:700; font-family:var(--sans); padding:6px 14px; cursor:pointer; font-size:13px;">▶ เริ่มวัด</button>`;
+}
+
+function startMeasure() {
+  if (!selectedJob) return;
+  document.getElementById('coil-id').value = selectedJob.slitId;
+  generateTableWith(selectedJob.slitId, parseFloat(selectedJob.length) || 1000);
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#job-search') && !e.target.closest('#job-dropdown')) {
+    document.getElementById('job-dropdown').style.display = 'none';
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// GENERATE TABLE
+// ══════════════════════════════════════════════════════════════
+function generateTable() {
+  const coilId = document.getElementById('coil-id').value.trim() || 'COIL-001';
+  const length = parseFloat(document.getElementById('coil-length').value) || 1000;
+  generateTableWith(coilId, length);
+}
+
+function generateTableWith(coilId, length) {
+  const mode = document.getElementById('interval-mode').value;
+  ptCount    = parseInt(document.getElementById('pt-count').value);
+
+  document.getElementById('header-coil-id').textContent = coilId || '—';
+
+  let positions = [];
+  if (mode === 'custom') {
+    positions = [0, Math.round(length*0.25), Math.round(length*0.5), Math.round(length*0.75), length];
+  } else {
+    const step = parseInt(mode);
+    for (let p = 0; p <= length; p += step) positions.push(p);
+    if (positions[positions.length-1] !== length) positions.push(length);
+  }
+
+  rows = positions.map(p => ({ pos: p, vals: Array(ptCount).fill('') }));
+  renderTable();
+  renderCanvas();
+  updateStats();
+
+  ['canvas-section','stats-section','table-section','action-row'].forEach(id => {
+    document.getElementById(id).style.display = '';
+  });
+
+  toast('✅ สร้างตาราง ' + positions.length + ' จุดวัด', 'ok');
+}
+
+// ══════════════════════════════════════════════════════════════
+// RENDER TABLE
+// ══════════════════════════════════════════════════════════════
+function renderTable() {
+  const labels = getPtLabels();
+  const head   = document.getElementById('table-head');
+  const body   = document.getElementById('table-body');
+
+  head.innerHTML = `<tr>
+    <th>ตำแหน่ง (m)</th>
+    ${labels.map((l,i) => `<th style="color:${PT_COLORS[i]}">${l}</th>`).join('')}
+    <th>AVG</th>
+    <th style="width:28px;"></th>
+  </tr>`;
+
+  body.innerHTML = rows.map((r, ri) => `
+    <tr id="row-${ri}">
+      <td><input class="pos-input" type="number" value="${r.pos}" onchange="updatePos(${ri}, this.value)"></td>
+      ${r.vals.map((v, vi) => `
+        <td><input class="thk-cell" type="number" step="0.001"
+          id="cell-${ri}-${vi}" value="${v}" placeholder="—"
+          oninput="onCellInput(${ri},${vi},this.value)"
+          onkeydown="cellNav(event,${ri},${vi})"></td>`).join('')}
+      <td><span class="avg-chip" id="avg-${ri}">—</span></td>
+      <td><button class="btn-del-row" onclick="deleteRow(${ri})" title="ลบจุดนี้">✕</button></td>
+    </tr>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// CELL HANDLERS
+// ══════════════════════════════════════════════════════════════
+function onCellInput(ri, vi, val) {
+  rows[ri].vals[vi] = val === '' ? '' : parseFloat(val);
+  updateRowVisual(ri);
+  renderCanvas();
+  updateStats();
+}
+
+function updatePos(ri, val) {
+  rows[ri].pos = parseFloat(val) || 0;
+  rows.sort((a,b) => a.pos - b.pos);
+  renderTable();
+  renderCanvas();
+}
+
+function getSpec() {
+  specMax    = parseFloat(document.getElementById('spec-max').value)    || null;
+  specMin    = parseFloat(document.getElementById('spec-min').value)    || null;
+  specTarget = parseFloat(document.getElementById('spec-target').value) || null;
+}
+
+function cellClass(val) {
+  getSpec();
+  if (val === '' || isNaN(val)) return '';
+  const v = parseFloat(val);
+  if (specMax !== null && specMin !== null) {
+    if (v > specMax || v < specMin) return 'val-fail';
+    const warn = (specMax - specMin) * 0.05;
+    if (v > specMax - warn || v < specMin + warn) return 'val-warn';
+  }
+  return 'val-pass';
+}
+
+function avgClass(avg) {
+  getSpec();
+  if (isNaN(avg)) return '';
+  if (specMax !== null && specMin !== null) {
+    if (avg > specMax || avg < specMin) return 'avg-fail';
+    const warn = (specMax - specMin) * 0.05;
+    if (avg > specMax - warn || avg < specMin + warn) return 'avg-warn';
+  }
+  return 'avg-pass';
+}
+
+function updateRowVisual(ri) {
+  const r = rows[ri];
+  r.vals.forEach((v, vi) => {
+    const el = document.getElementById(`cell-${ri}-${vi}`);
+    if (el) el.className = 'thk-cell ' + cellClass(v);
+  });
+  const nums  = r.vals.filter(v => v !== '' && !isNaN(v)).map(Number);
+  const avgEl = document.getElementById(`avg-${ri}`);
+  if (!avgEl) return;
+  if (!nums.length) { avgEl.textContent = '—'; avgEl.className = 'avg-chip'; return; }
+  const avg = nums.reduce((a,b)=>a+b,0)/nums.length;
+  avgEl.textContent = avg.toFixed(3);
+  avgEl.className   = 'avg-chip ' + avgClass(avg);
+}
+
+function revalidateAll() {
+  rows.forEach((r, ri) => updateRowVisual(ri));
+  renderCanvas();
+  updateStats();
+}
+
+function cellNav(e, ri, vi) {
+  const moves = { Enter:'down', ArrowDown:'down', ArrowUp:'up', ArrowRight:'right', ArrowLeft:'left' };
+  const dir   = moves[e.key];
+  if (!dir) return;
+  let next;
+  if (dir === 'down')  next = document.getElementById(`cell-${ri+1}-${vi}`);
+  if (dir === 'up')    next = document.getElementById(`cell-${ri-1}-${vi}`);
+  if (dir === 'right') next = document.getElementById(`cell-${ri}-${vi+1}`);
+  if (dir === 'left')  next = document.getElementById(`cell-${ri}-${vi-1}`);
+  if (next) { e.preventDefault(); next.focus(); next.select(); }
+}
+
+// ══════════════════════════════════════════════════════════════
+// ADD / DELETE ROW
+// ══════════════════════════════════════════════════════════════
+function addRow() {
+  const lastPos = rows.length ? rows[rows.length-1].pos : 0;
+  rows.push({ pos: lastPos + 100, vals: Array(ptCount).fill('') });
+  renderTable();
+  renderCanvas();
+  document.getElementById('table-body').lastElementChild?.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+function deleteRow(ri) {
+  if (rows.length <= 1) { toast('⚠️ ต้องมีอย่างน้อย 1 จุด', 'err'); return; }
+  rows.splice(ri, 1);
+  renderTable();
+  renderCanvas();
+  updateStats();
+}
+
+// ══════════════════════════════════════════════════════════════
+// CANVAS CHART
+// ══════════════════════════════════════════════════════════════
+function renderCanvas() {
+  const canvas  = document.getElementById('profileCanvas');
+  const wrap    = document.querySelector('.coil-scroll-wrap');
+  const W_per_m = 0.18;
+  const maxLen  = rows.length ? Math.max(...rows.map(r=>r.pos)) : 1000;
+  const minW    = wrap.clientWidth || 340;
+  const W       = Math.max(minW, maxLen * W_per_m + 80);
+  const H       = 180;
+  canvas.width  = W;
+  canvas.height = H;
+
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  getSpec();
+
+  const PAD_L = 50, PAD_R = 20, PAD_T = 20, PAD_B = 30;
+  const chartW = W - PAD_L - PAD_R;
+  const chartH = H - PAD_T - PAD_B;
+
+  const allVals = rows.flatMap(r => r.vals.filter(v=>v!==''&&!isNaN(v)).map(Number));
+  if (!allVals.length) {
+    ctx.fillStyle = '#6c7a9c';
+    ctx.font = '12px IBM Plex Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('กรอกค่าความหนาในตารางเพื่อแสดงกราฟ', W/2, H/2);
+    return;
+  }
+
+  const vMin   = Math.min(...allVals, specMin||999) - 0.05;
+  const vMax   = Math.max(...allVals, specMax||-999) + 0.05;
+  const vRange = vMax - vMin || 0.1;
+
+  function xOf(pos) { return PAD_L + (pos / (maxLen||1)) * chartW; }
+  function yOf(val) { return PAD_T + chartH - ((val - vMin) / vRange) * chartH; }
+
+  // Spec bands
+  if (specMax && specMin) {
+    ctx.fillStyle = 'rgba(243,139,168,0.06)';
+    ctx.fillRect(PAD_L, PAD_T, chartW, yOf(specMax) - PAD_T);
+    ctx.fillRect(PAD_L, yOf(specMin), chartW, (PAD_T+chartH) - yOf(specMin));
+    const warn = (specMax-specMin)*0.05;
+    ctx.fillStyle = 'rgba(250,179,135,0.06)';
+    ctx.fillRect(PAD_L, yOf(specMax), chartW, yOf(specMax-warn)-yOf(specMax));
+    ctx.fillRect(PAD_L, yOf(specMin+warn), chartW, yOf(specMin)-yOf(specMin+warn));
+    [specMax, specMin].forEach(sv => {
+      ctx.beginPath(); ctx.strokeStyle = 'rgba(243,139,168,0.5)'; ctx.lineWidth = 1;
+      ctx.setLineDash([4,4]); ctx.moveTo(PAD_L, yOf(sv)); ctx.lineTo(PAD_L+chartW, yOf(sv)); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(243,139,168,0.7)'; ctx.font = '9px IBM Plex Mono, monospace';
+      ctx.textAlign = 'right'; ctx.fillText(sv.toFixed(3), PAD_L-4, yOf(sv)+3);
+    });
+    if (specTarget) {
+      ctx.beginPath(); ctx.strokeStyle = 'rgba(166,227,161,0.4)'; ctx.lineWidth = 1;
+      ctx.setLineDash([6,4]); ctx.moveTo(PAD_L, yOf(specTarget)); ctx.lineTo(PAD_L+chartW, yOf(specTarget));
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+  }
+
+  // Grid
+  ctx.strokeStyle = '#253048'; ctx.lineWidth = 0.5;
+  for (let i=0; i<=4; i++) {
+    const y = PAD_T + (chartH/4)*i;
+    ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(PAD_L+chartW, y); ctx.stroke();
+    const label = (vMax - (vRange/4)*i).toFixed(3);
+    ctx.fillStyle = '#3d4f6c'; ctx.font = '9px IBM Plex Mono, monospace';
+    ctx.textAlign = 'right'; ctx.fillText(label, PAD_L-4, y+3);
+  }
+
+  // X labels
+  const step = maxLen <= 500 ? 50 : maxLen <= 2000 ? 200 : 500;
+  for (let p=0; p<=maxLen; p+=step) {
+    ctx.fillStyle = '#3d4f6c'; ctx.font = '9px IBM Plex Mono, monospace';
+    ctx.textAlign = 'center'; ctx.fillText(p+'m', xOf(p), H-8);
+  }
+
+  // Data lines
+  for (let vi=0; vi<ptCount; vi++) {
+    const pts = rows.map(r => ({ x: r.pos, v: r.vals[vi] })).filter(p => p.v !== '' && !isNaN(p.v));
+    if (pts.length < 2) continue;
+    ctx.beginPath(); ctx.strokeStyle = PT_COLORS[vi]; ctx.lineWidth = 1.5; ctx.globalAlpha = 0.85;
+    pts.forEach((p,i) => { const x=xOf(p.x), y=yOf(Number(p.v)); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+    ctx.stroke(); ctx.globalAlpha = 1;
+    pts.forEach(p => {
+      const x = xOf(p.x), y = yOf(Number(p.v));
+      const cc = cellClass(p.v);
+      ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI*2);
+      ctx.fillStyle = cc==='val-fail'?'#f38ba8':cc==='val-warn'?'#fab387':PT_COLORS[vi];
+      ctx.fill();
+    });
+  }
+
+  // Legend
+  const ptLabels = getPtLabels();
+  document.getElementById('pt-legend').innerHTML = ptLabels.map((l,i)=>`
+    <div class="pt-legend-item">
+      <div class="pt-legend-line" style="background:${PT_COLORS[i]}"></div>
+      <span>${l}</span>
+    </div>`).join('');
+
+  // Tooltip
+  canvas.onmousemove = (e) => {
+    const rect  = canvas.getBoundingClientRect();
+    const mx    = e.clientX - rect.left;
+    const posM  = ((mx - PAD_L) / chartW) * maxLen;
+    let nearest = null, minDist = 999;
+    rows.forEach(r => { const d = Math.abs(r.pos - posM); if (d < minDist) { minDist = d; nearest = r; } });
+    if (nearest && minDist < 30) {
+      const tip  = document.getElementById('tooltip');
+      const nums = nearest.vals.filter(v=>v!==''&&!isNaN(v)).map(Number);
+      const avg  = nums.length ? (nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(3) : '—';
+      tip.innerHTML = `<b style="color:var(--accent)">${nearest.pos} m</b><br>${
+        ptLabels.map((l,i)=>`<span style="color:${PT_COLORS[i]}">${l}: ${nearest.vals[i]||'—'}</span>`).join('  ')
+      }<br>AVG: <b>${avg}</b>`;
+      tip.style.display = 'block';
+      tip.style.left = (e.clientX + 14) + 'px';
+      tip.style.top  = (e.clientY - 10) + 'px';
+    } else { document.getElementById('tooltip').style.display = 'none'; }
+  };
+  canvas.onmouseleave = () => { document.getElementById('tooltip').style.display = 'none'; };
+}
+
+// ══════════════════════════════════════════════════════════════
+// STATS
+// ══════════════════════════════════════════════════════════════
+function updateStats() {
+  getSpec();
+  const ci    = ptCount === 5 ? 2 : 1;
+  const allC  = rows.map(r => r.vals[ci]).filter(v => v !== '' && !isNaN(v)).map(Number);
+  const allVals = rows.flatMap(r => r.vals.filter(v=>v!==''&&!isNaN(v)).map(Number));
+
+  if (!allVals.length) {
+    ['stat-avg','stat-dev','stat-pass-rate','stat-status'].forEach(id => { document.getElementById(id).textContent = '—'; });
+    return;
+  }
+
+  const avgC  = allC.length ? allC.reduce((a,b)=>a+b,0)/allC.length : null;
+  const avgEl = document.getElementById('stat-avg');
+  avgEl.textContent = avgC ? avgC.toFixed(3) : '—';
+  avgEl.className   = 'stat-val ' + (avgC ? ((specMax&&avgC>specMax)||(specMin&&avgC<specMin) ? 'stat-fail' : 'stat-pass') : 'stat-accent');
+
+  if (specTarget) {
+    const maxDev = Math.max(...allVals.map(v => Math.abs(v - specTarget)));
+    const devEl  = document.getElementById('stat-dev');
+    devEl.textContent = (maxDev >= 0 ? '+' : '') + maxDev.toFixed(3);
+    devEl.className   = 'stat-val ' + (specMax && maxDev > (specMax-specTarget) ? 'stat-fail' : maxDev > (specMax||0-specTarget)*0.7 ? 'stat-warn' : 'stat-pass');
+  }
+
+  let passCount = 0;
+  allVals.forEach(v => { if (specMax===null||specMin===null||(v<=specMax&&v>=specMin)) passCount++; });
+  const rate = Math.round(passCount/allVals.length*100);
+  const prEl = document.getElementById('stat-pass-rate');
+  prEl.textContent = rate + '%';
+  prEl.className   = 'stat-val ' + (rate>=95?'stat-pass':rate>=80?'stat-warn':'stat-fail');
+  document.getElementById('pass-bar').style.width      = rate + '%';
+  document.getElementById('pass-bar').style.background = rate>=95?'var(--green)':rate>=80?'var(--orange)':'var(--red)';
+
+  const stEl  = document.getElementById('stat-status');
+  const stSub = document.getElementById('stat-status-sub');
+  const hasFail = allVals.some(v => specMax!==null&&specMin!==null&&(v>specMax||v<specMin));
+  if (hasFail)        { stEl.textContent = 'FAIL'; stEl.className = 'stat-val stat-fail'; stSub.textContent = 'มีค่านอก Spec'; }
+  else if (rate < 100){ stEl.textContent = 'WARN'; stEl.className = 'stat-val stat-warn'; stSub.textContent = 'บางจุดใกล้ขอบเขต'; }
+  else                { stEl.textContent = 'PASS'; stEl.className = 'stat-val stat-pass'; stSub.textContent = 'ทุกจุดผ่าน Spec'; }
+}
+
+// ══════════════════════════════════════════════════════════════
+// GET CURRENT STATUS FOR SAVE
+// ══════════════════════════════════════════════════════════════
+function getCurrentPassRate() {
+  getSpec();
+  const allVals = rows.flatMap(r => r.vals.filter(v=>v!==''&&!isNaN(v)).map(Number));
+  if (!allVals.length) return 0;
+  const pass = allVals.filter(v => specMax===null||specMin===null||(v<=specMax&&v>=specMin)).length;
+  return Math.round(pass/allVals.length*100);
+}
+function getCurrentStatus() {
+  getSpec();
+  const allVals = rows.flatMap(r => r.vals.filter(v=>v!==''&&!isNaN(v)).map(Number));
+  if (!allVals.length) return '';
+  const hasFail = allVals.some(v => specMax!==null&&specMin!==null&&(v>specMax||v<specMin));
+  const rate    = getCurrentPassRate();
+  return hasFail ? 'FAIL' : rate < 100 ? 'WARN' : 'PASS';
+}
+
+// ══════════════════════════════════════════════════════════════
+// SAVE TO GAS
+// ══════════════════════════════════════════════════════════════
+function saveToGAS() {
+  const coilId = (selectedJob?.slitId) ||
+    document.getElementById('coil-id')?.value?.trim() ||
+    document.getElementById('job-search')?.value?.trim();
+
+  if (!coilId) { toast('⚠️ กรุณาระบุ Coil ID ก่อน', 'err'); return; }
+  if (!rows.length) { toast('⚠️ ยังไม่มีข้อมูล', 'err'); return; }
+
+  const allVals = rows.flatMap(r => r.vals.filter(v=>v!==''&&!isNaN(v)).map(Number));
+  if (!allVals.length) { toast('⚠️ กรอกค่าความหนาก่อนบันทึก', 'err'); return; }
+
+  getSpec();
+  const btn = document.getElementById('btn-save-gas');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> กำลังบันทึก...';
+
+  // ดึง jobId จาก selectedJob หรือ URL params
+  const urlParams = new URLSearchParams(window.location.search);
+  const jobId     = selectedJob?.parentId || urlParams.get('jobId') || '';
+
+  const payload = {
+    coilId,
+    jobId,
+    specMax:    specMax    || null,
+    specMin:    specMin    || null,
+    specTarget: specTarget || null,
+    ptCount,
+    interval:   parseInt(document.getElementById('interval-mode').value) || 100,
+    passRate:   getCurrentPassRate(),
+    status:     getCurrentStatus(),
+    rows:       rows.map(r => ({ pos: r.pos, vals: r.vals })),
+    savedAt:    new Date().toISOString()
+  };
+
+  callGAS('saveThicknessProfile', [payload])
+    .then(d => {
+      if (d.error) {
+        toast('❌ ' + d.error, 'err');
+      } else {
+        toast(`✅ บันทึกสำเร็จ (row ${d.result?.rowId || ''})`, 'ok');
+      }
+    })
+    .catch(() => {
+      toast('⚠️ เชื่อมต่อ GAS ไม่ได้ — ลอง Export CSV แทน', 'err');
+    })
+    .finally(() => {
+      btn.disabled = false;
+      btn.innerHTML = '☁ บันทึกไป GAS';
+    });
+}
+
+// ══════════════════════════════════════════════════════════════
+// EXPORT CSV
+// ══════════════════════════════════════════════════════════════
+function exportCSV() {
+  const labels = getPtLabels();
+  const coilId = document.getElementById('coil-id').value ||
+                 document.getElementById('job-search').value || 'COIL';
+  const header = ['Position(m)', ...labels, 'AVG', 'Status'].join(',');
+  const lines  = rows.map(r => {
+    const nums   = r.vals.filter(v=>v!==''&&!isNaN(v)).map(Number);
+    const avg    = nums.length ? (nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(3) : '';
+    const cls    = avgClass(parseFloat(avg));
+    const status = cls==='avg-fail'?'FAIL':cls==='avg-warn'?'WARN':avg?'PASS':'';
+    return [r.pos, ...r.vals.map(v=>v===''?'':v), avg, status].join(',');
+  });
+  const csv  = [header, ...lines].join('\n');
+  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8'});
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `ThkProfile_${coilId}_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  toast('✅ Export CSV สำเร็จ', 'ok');
+}
+
+// ══════════════════════════════════════════════════════════════
+// HISTORY
+// ══════════════════════════════════════════════════════════════
+function loadHistory(filterJobId) {
+  const q   = filterJobId !== undefined ? filterJobId : document.getElementById('hist-filter-id').value.trim();
+  const el  = document.getElementById('history-list');
+  el.innerHTML = `<div class="history-empty"><span class="spinner"></span> กำลังโหลด...</div>`;
+
+  callGAS('getThicknessProfiles', [q])
+    .then(d => {
+      const list = d.result || [];
+      if (!list.length) {
+        el.innerHTML = `<div class="history-empty">ไม่พบข้อมูล${q ? ` สำหรับ "${q}"` : ''}</div>`;
+        return;
+      }
+      el.innerHTML = list.map((p, idx) => `
+        <div class="history-card" onclick="viewHistoryProfile(${idx})" data-idx="${idx}">
+          <div class="history-card-top">
+            <div>
+              <div class="history-coil-id">${p.coilId || '—'}</div>
+              ${p.jobId ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">Job: ${p.jobId}</div>` : ''}
+            </div>
+            <div class="history-ts">${p.timestamp}</div>
+          </div>
+          <div class="history-meta">
+            <span class="history-chip ${p.status==='PASS'?'st-pass':p.status==='FAIL'?'st-fail':'st-warn'}">${p.status||'—'}</span>
+            <span class="history-chip">Pass ${p.passRate}%</span>
+            <span class="history-chip">Target ${p.target} mm</span>
+            <span class="history-chip">${p.ptCount} จุด · ${p.interval}m</span>
+            <span class="history-chip">${p.rows?.length||0} ตำแหน่ง</span>
+          </div>
+        </div>`).join('');
+
+      // เก็บ data ไว้สำหรับ view
+      window._historyData = list;
+      toast(`✅ พบ ${list.length} รายการ`, 'ok');
+    })
+    .catch(() => {
+      el.innerHTML = `<div class="history-empty">⚠️ เชื่อมต่อ GAS ไม่ได้</div>`;
+    });
+}
+
+function viewHistoryProfile(idx) {
+  const p = window._historyData?.[idx];
+  if (!p) return;
+
+  // โหลดข้อมูล profile เก่ากลับเข้า editor
+  switchMainTab('new');
+
+  ptCount = p.ptCount || 3;
+  document.getElementById('pt-count').value    = ptCount;
+  document.getElementById('spec-target').value = p.target  || '';
+  document.getElementById('spec-max').value    = p.specMax || '';
+  document.getElementById('spec-min').value    = p.specMin || '';
+  document.getElementById('job-search').value  = p.coilId  || '';
+  document.getElementById('header-coil-id').textContent = p.coilId || '—';
+
+  rows = (p.rows || []).map(r => ({
+    pos:  r.pos,
+    vals: Array.isArray(r.vals) ? r.vals.map(v => v === '' ? '' : Number(v)) : Array(ptCount).fill('')
+  }));
+
+  renderTable();
+  revalidateAll();
+  ['canvas-section','stats-section','table-section','action-row'].forEach(id => {
+    document.getElementById(id).style.display = '';
+  });
+
+  toast(`📂 โหลด profile: ${p.coilId} (${p.timestamp})`, 'ok');
+}
+
+// ══════════════════════════════════════════════════════════════
+// TOAST
+// ══════════════════════════════════════════════════════════════
+function toast(msg, type='ok') {
+  const wrap = document.getElementById('toast-wrap');
+  const el   = document.createElement('div');
+  el.className   = `toast ${type}`;
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+</script>
+</body>
+</html>
