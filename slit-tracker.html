@@ -595,6 +595,1303 @@ canvas{display:block;width:100%!important;max-height:220px}
 // ═══════════════════════════════════════════
 // CONFIG — แก้ URL เป็น GAS Deployment URL จริงของคุณ
 // ═══════════════════════════════════════════
+const GAS_URL = 'https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec';
+
+// Machine list — sync กับ Config sheet หรือกรอกตรงนี้
+const MACHINE_LIST = ['TM1','TM2','TM3','TM4','TM5','TM6','TM7','TM8','TM9','TM10','TM11','TM12','TM13','C-Section'];
+
+// ERW constants
+const PI = Math.PI, E = 200000, RHO = 7.85;
+
+// ═══════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════
+let currentSlit    = null;   // ม้วนที่ค้นพบจาก Tab1
+let simSlit        = null;   // ม้วนใน Tab2
+let simPipeType    = 'round';
+let simThkSource   = 'profile';
+let loadedProfile  = null;   // profile object จาก Thk_Profile_Log
+let allProfiles    = [];     // รายการ profiles ของม้วนปัจจุบัน
+let inventoryData  = [];
+
+// ═══════════════════════════════════════════
+// GAS CALL
+// ═══════════════════════════════════════════
+// ── GAS CALL ──────────────────────────────────────────────────────────
+// สำคัญ: ไม่ต้องใส่ Content-Type header เลย
+// เพราะ GAS ไม่รองรับ CORS preflight (OPTIONS)
+// การไม่ใส่ header ทำให้ browser ส่งเป็น "simple request" → ไม่มี preflight
+// ──────────────────────────────────────────────────────────────────────
+function callGAS(action, args = []) {
+  return fetch(GAS_URL, {
+    method: 'POST',
+    body: JSON.stringify({ action, args })
+    // ❌ อย่าใส่ headers: { 'Content-Type': ... } — จะทำให้ CORS preflight fail
+  }).then(r => r.json());
+}
+
+// ═══════════════════════════════════════════
+// ERW CALCULATIONS (จาก erw_strip_width_calculator)
+// ═══════════════════════════════════════════
+function calcRound(od, t, fy = 240, sizingPct = 1.0, upset = 1.5, edgeTrim = 0.4) {
+  const Dm    = od - t;
+  const circ  = PI * Dm;
+  const tD    = t / od;
+  const form  = 0.3 + tD * 15;
+  const sizing = PI * od * (sizingPct / 100);
+  const spring = (fy / E) * (Dm / 2) * 1.2;
+  const edge   = edgeTrim * 2;
+  const total  = circ + form + upset + sizing + spring + edge;
+  return { total, breakdown: { circ, form, upset, sizing, spring, edge } };
+}
+
+function calcSquareRect(H, B, t, r, fy = 240, sizingPct = 1.0, upset = 1.5, edgeTrim = 0.4) {
+  const rn       = Math.max(r - t / 2, 0.5);
+  const straight = 2 * (H - 2 * r) + 2 * (B - 2 * r);
+  const corners  = 2 * PI * rn;
+  const perim    = straight + corners;
+  const tD       = t / Math.min(H, B);
+  const form     = 0.3 + tD * 12;
+  const refPerim = 2 * (H + B);
+  const sizing   = refPerim * (sizingPct / 100);
+  const spring   = (fy / E) * (Math.min(H, B) / 2) * 1.0;
+  const edge     = edgeTrim * 2;
+  const total    = perim + form + upset + sizing + spring + edge;
+  return { total };
+}
+
+function roundArea(od, t)       { return PI * (od - t) * t; }
+function sqRectArea(H, B, t, r) {
+  const ri = Math.max(r - t, 0);
+  return H * B - (H - 2*t) * (B - 2*t) - (4 - PI) * ri * ri;
+}
+
+function calcStripWidthNeeded() {
+  if (simPipeType === 'round') {
+    const od = parseFloat(document.getElementById('pipe-od').value) || 0;
+    const t  = parseFloat(document.getElementById('pipe-wt').value) || 0;
+    if (!od || !t) return null;
+    return calcRound(od, t).total;
+  } else if (simPipeType === 'square') {
+    const A = parseFloat(document.getElementById('pipe-sq-a').value) || 0;
+    const t = parseFloat(document.getElementById('pipe-sq-t').value) || 0;
+    const r = parseFloat(document.getElementById('pipe-sq-r').value) || 5;
+    if (!A || !t) return null;
+    return calcSquareRect(A, A, t, r).total;
+  } else {
+    const H = parseFloat(document.getElementById('pipe-rh').value) || 0;
+    const B = parseFloat(document.getElementById('pipe-rb').value) || 0;
+    const t = parseFloat(document.getElementById('pipe-rt').value) || 0;
+    const r = parseFloat(document.getElementById('pipe-rr').value) || 6;
+    if (!H || !B || !t) return null;
+    return calcSquareRect(H, B, t, r).total;
+  }
+}
+
+// น้ำหนักต่อเมตรของท่อ (kg/m)
+function calcPipeWeightPerM() {
+  if (simPipeType === 'round') {
+    const od = parseFloat(document.getElementById('pipe-od').value) || 0;
+    const t  = parseFloat(document.getElementById('pipe-wt').value) || 0;
+    return roundArea(od, t) * RHO / 1e6 * 1000;
+  } else if (simPipeType === 'square') {
+    const A = parseFloat(document.getElementById('pipe-sq-a').value) || 0;
+    const t = parseFloat(document.getElementById('pipe-sq-t').value) || 0;
+    const r = parseFloat(document.getElementById('pipe-sq-r').value) || 5;
+    return sqRectArea(A, A, t, r) * RHO / 1e6 * 1000;
+  } else {
+    const H = parseFloat(document.getElementById('pipe-rh').value) || 0;
+    const B = parseFloat(document.getElementById('pipe-rb').value) || 0;
+    const t = parseFloat(document.getElementById('pipe-rt').value) || 0;
+    const r = parseFloat(document.getElementById('pipe-rr').value) || 6;
+    return sqRectArea(H, B, t, r) * RHO / 1e6 * 1000;
+  }
+}
+
+// ═══════════════════════════════════════════
+// COIL LENGTH CALCULATION
+// coilLength (m) = weight / (width × thk × 7.85 / 1000)
+// ═══════════════════════════════════════════
+function calcCoilLength(weight, widthMM, thkMM) {
+  if (!weight || !widthMM || !thkMM) return 0;
+  const weightPerM = widthMM * thkMM * RHO / 1000; // kg/m
+  return weight / weightPerM;
+}
+
+// ═══════════════════════════════════════════
+// INTERPOLATE THICKNESS ณ ตำแหน่ง posM
+// ═══════════════════════════════════════════
+function interpolateThk(rows, posM) {
+  if (!rows || rows.length === 0) return null;
+  const getAvg = r => {
+    const vals = (r.vals || []).filter(v => v !== '' && !isNaN(v)).map(Number);
+    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  };
+  const before = [...rows].filter(r => r.pos <= posM).sort((a, b) => b.pos - a.pos)[0];
+  const after  = [...rows].filter(r => r.pos >  posM).sort((a, b) => a.pos - b.pos)[0];
+  if (!before && !after) return null;
+  if (!before) return getAvg(after);
+  if (!after)  return getAvg(before);
+  const t0 = getAvg(before), t1 = getAvg(after);
+  if (t0 === null || t1 === null) return t0 ?? t1;
+  const frac = (posM - before.pos) / ((after.pos - before.pos) || 1);
+  return t0 + frac * (t1 - t0);
+}
+
+// ═══════════════════════════════════════════
+// THICKNESS FOR PIPE RANGE [startM, endM]
+// ═══════════════════════════════════════════
+function getThkForRange(profileRows, startM, endM, fallbackThk) {
+  if (!profileRows || profileRows.length === 0) return fallbackThk;
+  const points = profileRows.filter(r => r.pos >= startM && r.pos < endM);
+  if (points.length > 0) {
+    const avgs = points.map(r => {
+      const vals = (r.vals || []).filter(v => v !== '' && !isNaN(v)).map(Number);
+      return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+    }).filter(v => v !== null);
+    if (avgs.length > 0) return avgs.reduce((a, b) => a + b, 0) / avgs.length;
+  }
+  // Interpolate midpoint
+  const midM = (startM + endM) / 2;
+  return interpolateThk(profileRows, midM) ?? fallbackThk;
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  // Populate machine dropdown
+  const sel = document.getElementById('checkin-machine');
+  MACHINE_LIST.forEach(m => sel.innerHTML += `<option value="${m}">${m}</option>`);
+});
+
+// ═══════════════════════════════════════════
+// TAB NAVIGATION
+// ═══════════════════════════════════════════
+function switchTab(id) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.main-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  const idx = { search: 0, simulate: 1, inventory: 2 }[id];
+  document.querySelectorAll('.main-tab')[idx].classList.add('active');
+  if (id === 'inventory' && inventoryData.length === 0) loadInventory();
+}
+
+// ═══════════════════════════════════════════
+// TAB 1: SEARCH
+// ═══════════════════════════════════════════
+function searchSlit() {
+  const id = document.getElementById('search-input').value.trim();
+  if (!id) { toast('กรุณาใส่ Slit ID', 'warn'); return; }
+  const statusEl = document.getElementById('search-status');
+  statusEl.innerHTML = '<span class="spinner"></span> กำลังค้นหา...';
+  document.getElementById('slit-result').style.display = 'none';
+
+  callGAS('getSlitById', [id])
+    .then(res => {
+      if (res.error || !res.result) {
+        statusEl.textContent = `⚠️ ไม่พบ Slit ID: ${id}`;
+        toast(`ไม่พบ: ${id}`, 'err');
+        return;
+      }
+      currentSlit = res.result;
+      statusEl.textContent = `✅ พบข้อมูลม้วน: ${id}`;
+      renderSlitResult(currentSlit);
+      // โหลด profiles ในพื้นหลัง
+      loadProfilesForSlit(id);
+    })
+    .catch(() => { statusEl.textContent = '⚠️ เชื่อมต่อ GAS ไม่ได้'; });
+}
+
+function renderSlitResult(slit) {
+  const nom_thk = slit.thkC || slit.thkL || slit.thkR || 0;
+  const coilLen = calcCoilLength(slit.weight, slit.width, nom_thk);
+
+  document.getElementById('result-id').textContent = slit.slitId;
+  if (slit.parentId) {
+    const pb = document.getElementById('result-parent');
+    pb.textContent = 'จาก: ' + slit.parentId; pb.style.display = 'inline';
+  }
+  document.getElementById('r-width').innerHTML   = `<b>${slit.width}</b><span class="sdu">mm</span>`;
+  document.getElementById('r-thk').innerHTML     = `<b>${nom_thk.toFixed(3)}</b><span class="sdu">mm</span>`;
+  document.getElementById('r-weight').innerHTML  = `<b>${slit.weight.toFixed(0)}</b><span class="sdu">kg</span>`;
+  document.getElementById('r-length').innerHTML  = `<b>${coilLen.toFixed(0)}</b><span class="sdu">m</span>`;
+  document.getElementById('r-grade').textContent   = slit.grade   || '—';
+  document.getElementById('r-machine').textContent = slit.machine || '—';
+  document.getElementById('slit-result').style.display = 'block';
+}
+
+function loadProfilesForSlit(slitId) {
+  callGAS('getThicknessProfiles', [slitId]).then(res => {
+    if (res.error || !res.result) return;
+    allProfiles = res.result || [];
+    const badge = document.getElementById('profile-badge');
+    const btn   = document.getElementById('btn-load-profile');
+    if (allProfiles.length > 0) {
+      badge.className = 'slit-tag ok';
+      badge.textContent = `✅ มี Profile ${allProfiles.length} รายการ`;
+      btn.style.display = 'inline-flex';
+    } else {
+      badge.className = 'slit-tag no-profile';
+      badge.textContent = 'ยังไม่มี Profile';
+      btn.style.display = 'none';
+    }
+    // อัปเดต dropdown ใน simulate tab
+    updateProfileDropdown();
+  });
+}
+
+function loadProfileForSlit() {
+  if (allProfiles.length > 0) {
+    loadedProfile = allProfiles[0];
+    toast(`📂 โหลด profile: ${loadedProfile.coilId} (${loadedProfile.timestamp})`, 'ok');
+    updateProfileDropdown();
+  }
+}
+
+function gotoSimulate() {
+  if (!currentSlit) return;
+  simSlit = currentSlit;
+  updateSimSlitStrip();
+  // sync profiles
+  updateProfileDropdown();
+  switchTab('simulate');
+}
+
+// ═══════════════════════════════════════════
+// TAB 1: CHECK-IN
+// ═══════════════════════════════════════════
+function doCheckIn() {
+  if (!currentSlit) { toast('ค้นหาม้วนก่อน', 'warn'); return; }
+  const machine  = document.getElementById('checkin-machine').value;
+  const operator = document.getElementById('checkin-operator').value.trim();
+  const note     = document.getElementById('checkin-note').value.trim();
+  if (!machine) { toast('กรุณาเลือกเครื่อง', 'warn'); return; }
+  if (!operator) { toast('กรุณาใส่ชื่อผู้รับม้วน', 'warn'); return; }
+
+  toast('⏳ กำลังบันทึก...', 'warn');
+  callGAS('checkInSlit', [currentSlit.slitId, machine, operator, note])
+    .then(res => {
+      if (res.error) { toast('❌ Error: ' + res.error, 'err'); return; }
+      toast(`✅ Check-in สำเร็จ: ${currentSlit.slitId} → ${machine}`, 'ok');
+      // อัปเดต status badge
+      document.getElementById('slit-status-badge').className = 'status-badge in-use';
+      document.getElementById('slit-status-badge').textContent = '● IN USE';
+    })
+    .catch(() => toast('❌ เชื่อมต่อ GAS ไม่ได้', 'err'));
+}
+
+// ═══════════════════════════════════════════
+// TAB 2: SIMULATE — Setup
+// ═══════════════════════════════════════════
+function setPipeType(type) {
+  simPipeType = type;
+  ['round','square','rect'].forEach(t => {
+    document.getElementById('ptype-' + t).classList.toggle('active', t === type);
+    document.getElementById('fields-' + t).style.display = t === type ? (t === 'rect' ? 'grid' : 'grid') : 'none';
+  });
+  // rect has 2x2 grid
+  if (type === 'rect') {
+    document.getElementById('fields-rect').style.display = 'grid';
+    document.getElementById('fields-rect').style.gridTemplateColumns = '1fr 1fr';
+  }
+}
+
+function setThkSource(src) {
+  simThkSource = src;
+  ['profile','nominal','both'].forEach(s => {
+    document.getElementById('src-' + s).classList.toggle('active', s === src);
+  });
+  document.getElementById('profile-select-row').style.display =
+    (src === 'profile' || src === 'both') ? 'block' : 'none';
+  document.getElementById('th-nom-col').style.display = src === 'nominal' ? '' : '';
+}
+
+function loadSlitForSim() {
+  const id = document.getElementById('sim-slit-input').value.trim();
+  if (!id) { toast('ใส่ Slit ID ก่อน', 'warn'); return; }
+  callGAS('getSlitById', [id]).then(res => {
+    if (res.error || !res.result) { toast('ไม่พบ: ' + id, 'err'); return; }
+    simSlit = res.result;
+    currentSlit = res.result;
+    allProfiles = [];
+    updateSimSlitStrip();
+    loadProfilesForSlit(id);
+    toast('✅ โหลดม้วน: ' + id, 'ok');
+  });
+}
+
+function updateSimSlitStrip() {
+  if (!simSlit) return;
+  const nom_thk = simSlit.thkC || simSlit.thkL || simSlit.thkR || 0;
+  const coilLen = calcCoilLength(simSlit.weight, simSlit.width, nom_thk);
+  document.getElementById('sim-no-slit').style.display = 'none';
+  const strip = document.getElementById('sim-slit-strip');
+  strip.style.display = 'flex';
+  strip.innerHTML = `
+    <span class="slit-strip-id">${simSlit.slitId}</span>
+    <span class="slit-tag">W: ${simSlit.width} mm</span>
+    <span class="slit-tag">t: ${nom_thk.toFixed(3)} mm</span>
+    <span class="slit-tag">${simSlit.weight.toFixed(0)} kg</span>
+    <span class="slit-tag">${coilLen.toFixed(0)} m</span>
+    <span class="slit-tag ok">${simSlit.grade || '—'}</span>
+  `;
+  document.getElementById('sim-slit-input').value = simSlit.slitId;
+}
+
+function updateProfileDropdown() {
+  const sel = document.getElementById('profile-select');
+  sel.innerHTML = allProfiles.length === 0
+    ? '<option value="">— ยังไม่มี Profile สำหรับม้วนนี้ —</option>'
+    : allProfiles.map((p, i) =>
+        `<option value="${i}">${p.timestamp} | ${p.coilId} | ${p.rows?.length || 0} จุด | ${p.status}</option>`
+      ).join('');
+  if (allProfiles.length > 0) {
+    sel.value = '0';
+    onProfileSelect();
+  }
+}
+
+function onProfileSelect() {
+  const idx = parseInt(document.getElementById('profile-select').value);
+  if (isNaN(idx) || idx < 0 || idx >= allProfiles.length) {
+    loadedProfile = null;
+    document.getElementById('profile-loaded-info').style.display = 'none';
+    return;
+  }
+  loadedProfile = allProfiles[idx];
+  const infoEl = document.getElementById('profile-loaded-info');
+  infoEl.style.display = 'block';
+  infoEl.textContent = `✅ โหลดแล้ว: ${loadedProfile.rows?.length || 0} จุดวัด | interval ${loadedProfile.interval}m | ${loadedProfile.status}`;
+}
+
+// ═══════════════════════════════════════════
+// TAB 2: SIMULATE — RUN
+// ═══════════════════════════════════════════
+function runSimulate() {
+  if (!simSlit) { toast('กรุณาโหลดม้วนก่อน', 'warn'); return; }
+
+  const stripNeeded = calcStripWidthNeeded();
+  if (!stripNeeded) { toast('กรุณาใส่ขนาดท่อให้ครบ', 'warn'); return; }
+
+  const pipeLenMM = parseFloat(document.getElementById('pipe-len').value) || 6000;
+  const pipeLenM  = pipeLenMM / 1000;
+  const tolPct    = parseFloat(document.getElementById('weight-tol').value) || 10;
+
+  const nom_thk  = simSlit.thkC || simSlit.thkL || simSlit.thkR || 0;
+  const coilLenM = calcCoilLength(simSlit.weight, simSlit.width, nom_thk);
+  const totalPipes = Math.floor(coilLenM / pipeLenM);
+
+  if (totalPipes === 0) { toast('ความยาวม้วนน้อยกว่าความยาวท่อ', 'err'); return; }
+
+  // Profile rows
+  const profileRows = (loadedProfile && (simThkSource === 'profile' || simThkSource === 'both'))
+    ? (loadedProfile.rows || []) : [];
+
+  // คำนวณน้ำหนักต่อเมตรจากขนาดท่อจริง (kg/m ของเนื้อท่อ)
+  const pipeWtPerM = calcPipeWeightPerM();
+
+  // น้ำหนัก nominal (ใช้ความหนา nom_thk ทุกเส้น)
+  // สูตร: strip weight per meter = Width × thk × 7.85 / 1000
+  const nomStripWtPerM = simSlit.width * nom_thk * RHO / 1000;
+  const nomPipeWt      = nomStripWtPerM * pipeLenM;
+
+  // คำนวณทีละเส้น
+  const pipesData = [];
+  for (let i = 0; i < totalPipes; i++) {
+    const startM = i * pipeLenM;
+    const endM   = (i + 1) * pipeLenM;
+
+    // ความหนาเฉลี่ยจาก profile
+    const profileThk = profileRows.length > 0
+      ? getThkForRange(profileRows, startM, endM, nom_thk)
+      : nom_thk;
+
+    // น้ำหนักจาก profile thickness (strip weight approach)
+    const profileStripWtPerM = simSlit.width * profileThk * RHO / 1000;
+    const profilePipeWt      = profileStripWtPerM * pipeLenM;
+
+    pipesData.push({
+      pipeNo:    i + 1,
+      startM:    startM.toFixed(1),
+      endM:      endM.toFixed(1),
+      profileThk,
+      profileWt: profilePipeWt,
+      nomWt:     nomPipeWt,
+      delta:     ((profilePipeWt - nomPipeWt) / nomPipeWt * 100)
+    });
+  }
+
+  // Stats
+  const weights = pipesData.map(p =>
+    simThkSource === 'nominal' ? p.nomWt : p.profileWt
+  );
+  const avgW   = weights.reduce((a, b) => a + b, 0) / weights.length;
+  const minW   = Math.min(...weights);
+  const maxW   = Math.max(...weights);
+  const warnCount = pipesData.filter(p => Math.abs(p.delta) > tolPct).length;
+
+  // Update Strip Width Check
+  const checkBox = document.getElementById('stripw-check-box');
+  const ok = simSlit.width >= stripNeeded;
+  checkBox.className = 'stripw-check ' + (ok ? 'ok' : 'warn');
+  document.getElementById('sw-needed-text').textContent =
+    `Strip Width ต้องการ: ${stripNeeded.toFixed(1)} mm`;
+  document.getElementById('sw-detail-text').textContent = ok
+    ? `✅ ม้วนนี้กว้าง ${simSlit.width} mm — พอเพียง (เหลือ ${(simSlit.width - stripNeeded).toFixed(1)} mm)`
+    : `⚠️ ม้วนนี้กว้าง ${simSlit.width} mm — ไม่พอ (ขาด ${(stripNeeded - simSlit.width).toFixed(1)} mm)`;
+
+  // Update KPIs
+  document.getElementById('kpi-total-pipes').innerHTML = `${totalPipes}<span class="kpi-unit">เส้น</span>`;
+  document.getElementById('kpi-coil-len').textContent   = `ความยาวม้วน: ${coilLenM.toFixed(0)} m`;
+  document.getElementById('kpi-avg-weight').innerHTML   = `${avgW.toFixed(3)}<span class="kpi-unit">kg</span>`;
+  document.getElementById('kpi-weight-range').textContent = `Min ${minW.toFixed(3)} — Max ${maxW.toFixed(3)} kg`;
+  document.getElementById('kpi-min-w').innerHTML  = `${minW.toFixed(3)}<span class="kpi-unit">kg</span>`;
+  document.getElementById('kpi-max-w').innerHTML  = `${maxW.toFixed(3)}<span class="kpi-unit">kg</span>`;
+  document.getElementById('kpi-warn-count').innerHTML = `${warnCount}<span class="kpi-unit">เส้น</span>`;
+  document.getElementById('chart-legend-tol').textContent = tolPct;
+
+  // Chart
+  drawWeightChart(pipesData, avgW, tolPct, simThkSource);
+
+  // Alerts
+  renderWeightAlerts(pipesData, tolPct);
+
+  // Table
+  renderSimTable(pipesData, tolPct, simThkSource);
+
+  document.getElementById('sim-results').style.display = 'block';
+  document.getElementById('sim-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  toast(`✅ Simulate สำเร็จ: ${totalPipes} เส้น`, 'ok');
+}
+
+// ═══════════════════════════════════════════
+// DRAW WEIGHT CHART
+// ═══════════════════════════════════════════
+function drawWeightChart(pipes, avgW, tolPct, source) {
+  const canvas = document.getElementById('weight-chart');
+  const parent = canvas.parentElement;
+  const W = parent.clientWidth - 24;
+  const H = 200;
+  canvas.width  = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+
+  const PAD_L = 48, PAD_R = 10, PAD_T = 14, PAD_B = 28;
+  const chartW = W - PAD_L - PAD_R;
+  const chartH = H - PAD_T - PAD_B;
+  const n = pipes.length;
+  if (n === 0) return;
+
+  const allVals = pipes.flatMap(p => [p.profileWt, p.nomWt]);
+  const vMin = Math.min(...allVals) * 0.98;
+  const vMax = Math.max(...allVals) * 1.02;
+  const vRange = vMax - vMin || 1;
+
+  function xOf(i)   { return PAD_L + (i / (n - 1 || 1)) * chartW; }
+  function yOf(val) { return PAD_T + chartH - ((val - vMin) / vRange) * chartH; }
+
+  // Grid lines
+  ctx.strokeStyle = '#253048'; ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = PAD_T + (chartH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(PAD_L + chartW, y); ctx.stroke();
+    ctx.fillStyle = '#3d4f6c'; ctx.font = '8px IBM Plex Mono,monospace'; ctx.textAlign = 'right';
+    ctx.fillText((vMax - vRange / 4 * i).toFixed(3), PAD_L - 3, y + 3);
+  }
+
+  // Tolerance band
+  const yUpper = yOf(avgW * (1 + tolPct / 100));
+  const yLower = yOf(avgW * (1 - tolPct / 100));
+  ctx.fillStyle = 'rgba(243,139,168,.06)';
+  ctx.fillRect(PAD_L, Math.min(yUpper, yLower), chartW, Math.abs(yLower - yUpper));
+  ctx.strokeStyle = 'rgba(243,139,168,.35)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+  [yUpper, yLower].forEach(y => {
+    ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(PAD_L + chartW, y); ctx.stroke();
+  });
+  ctx.setLineDash([]);
+
+  // Average line
+  ctx.strokeStyle = 'rgba(137,220,235,.4)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+  ctx.beginPath(); ctx.moveTo(PAD_L, yOf(avgW)); ctx.lineTo(PAD_L + chartW, yOf(avgW)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Nominal line (green)
+  if (source !== 'profile' && pipes.length > 1) {
+    ctx.beginPath(); ctx.strokeStyle = 'rgba(166,227,161,.6)'; ctx.lineWidth = 1.5;
+    pipes.forEach((p, i) => i === 0 ? ctx.moveTo(xOf(i), yOf(p.nomWt)) : ctx.lineTo(xOf(i), yOf(p.nomWt)));
+    ctx.stroke();
+  }
+
+  // Profile line (accent)
+  if (source !== 'nominal' && n > 1) {
+    ctx.beginPath(); ctx.strokeStyle = '#89dceb'; ctx.lineWidth = 2;
+    pipes.forEach((p, i) => i === 0 ? ctx.moveTo(xOf(i), yOf(p.profileWt)) : ctx.lineTo(xOf(i), yOf(p.profileWt)));
+    ctx.stroke();
+
+    // Dots — warn ones in red
+    pipes.forEach((p, i) => {
+      const isWarn = Math.abs(p.delta) > tolPct;
+      ctx.beginPath();
+      ctx.arc(xOf(i), yOf(p.profileWt), n > 100 ? 1.5 : 3, 0, Math.PI * 2);
+      ctx.fillStyle = isWarn ? '#f38ba8' : '#89dceb';
+      ctx.fill();
+    });
+  }
+
+  // X-axis labels
+  ctx.fillStyle = '#3d4f6c'; ctx.font = '8px IBM Plex Mono,monospace'; ctx.textAlign = 'center';
+  const step = Math.max(1, Math.floor(n / 8));
+  for (let i = 0; i < n; i += step) {
+    ctx.fillText(pipes[i].pipeNo, xOf(i), H - 8);
+  }
+  ctx.fillText('เส้น#', W - 20, H - 8);
+}
+
+// ═══════════════════════════════════════════
+// ALERTS
+// ═══════════════════════════════════════════
+function renderWeightAlerts(pipes, tolPct) {
+  const alertEl = document.getElementById('weight-alerts');
+  const warnPipes = pipes.filter(p => Math.abs(p.delta) > tolPct);
+  if (warnPipes.length === 0) {
+    alertEl.style.display = 'none'; return;
+  }
+  alertEl.style.display = 'block';
+  alertEl.innerHTML = `
+    <div class="alert-badge">
+      <div class="icon">⚠️</div>
+      <div>
+        <div style="font-weight:700;color:var(--yellow);margin-bottom:4px">
+          พบ ${warnPipes.length} เส้นที่น้ำหนักเบี่ยงเบน > ${tolPct}%
+        </div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--muted)">
+          เส้น: ${warnPipes.map(p => p.pipeNo).slice(0, 10).join(', ')}${warnPipes.length > 10 ? ` ... +${warnPipes.length - 10}` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+// ═══════════════════════════════════════════
+// SIMULATE TABLE
+// ═══════════════════════════════════════════
+function renderSimTable(pipes, tolPct, source) {
+  const body = document.getElementById('sim-table-body');
+  const showNom = source !== 'profile';
+  document.getElementById('th-nom-col').style.display = showNom ? '' : 'none';
+
+  body.innerHTML = pipes.map(p => {
+    const isWarn = Math.abs(p.delta) > tolPct;
+    const rowClass = isWarn ? (Math.abs(p.delta) > tolPct * 2 ? 'danger-row' : 'warn-row') : '';
+    const statusTag = isWarn
+      ? `<span class="tag warn">⚠ +${p.delta.toFixed(1)}%</span>`
+      : `<span class="tag pass">OK</span>`;
+    return `<tr class="${rowClass}">
+      <td>${p.pipeNo}</td>
+      <td>${p.startM}–${p.endM}</td>
+      <td>${p.profileThk.toFixed(4)} mm</td>
+      <td>${p.profileWt.toFixed(4)}</td>
+      <td style="display:${showNom?'':'none'}">${p.nomWt.toFixed(4)}</td>
+      <td>${p.delta >= 0 ? '+' : ''}${p.delta.toFixed(2)}%</td>
+      <td>${statusTag}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════
+// TAB 3: INVENTORY
+// ═══════════════════════════════════════════
+function loadInventory() {
+  document.getElementById('inv-loading').innerHTML =
+    '<div class="empty-icon"><span class="spinner"></span></div><div>กำลังโหลด...</div>';
+  callGAS('getSlitInventory', [])
+    .then(res => {
+      if (res.error) { toast('❌ ' + res.error, 'err'); return; }
+      inventoryData = res.result || [];
+      buildInvFilters();
+      renderInventoryTable();
+    })
+    .catch(() => toast('❌ เชื่อมต่อ GAS ไม่ได้', 'err'));
+}
+
+function buildInvFilters() {
+  const widths = [...new Set(inventoryData.map(s => s.width).filter(v => v > 0))].sort((a,b)=>a-b);
+  const grades = [...new Set(inventoryData.map(s => s.grade).filter(Boolean))].sort();
+  const wSel = document.getElementById('inv-filter-width');
+  const gSel = document.getElementById('inv-filter-grade');
+  wSel.innerHTML = '<option value="">ทั้งหมด</option>' + widths.map(w => `<option value="${w}">${w} mm</option>`).join('');
+  gSel.innerHTML = '<option value="">ทั้งหมด</option>' + grades.map(g => `<option value="${g}">${g}</option>`).join('');
+}
+
+function renderInventoryTable() {
+  const fw = document.getElementById('inv-filter-width').value;
+  const fg = document.getElementById('inv-filter-grade').value;
+  let data = inventoryData;
+  if (fw) data = data.filter(s => String(s.width) === fw);
+  if (fg) data = data.filter(s => s.grade === fg);
+
+  // KPIs
+  document.getElementById('inv-total').textContent  = data.length;
+  document.getElementById('inv-weight').innerHTML   = `${data.reduce((a,s)=>a+s.weight,0).toFixed(0)}<span class="kpi-unit">kg</span>`;
+  document.getElementById('inv-in-use').innerHTML   = `${data.filter(s=>s.status==='IN_USE').length}<span class="kpi-unit">ม้วน</span>`;
+
+  if (data.length === 0) {
+    document.getElementById('inv-loading').innerHTML = '<div class="empty-icon">📭</div><div>ไม่พบข้อมูล</div>';
+    document.getElementById('inv-loading').style.display = 'block';
+    document.getElementById('inv-table-wrap').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('inv-loading').style.display = 'none';
+  document.getElementById('inv-table-wrap').style.display = 'block';
+
+  const nom_thk_of = s => s.thkC || s.thkL || s.thkR || 0;
+  document.getElementById('inv-table-body').innerHTML = data.map(s => {
+    const thk = nom_thk_of(s);
+    const len = calcCoilLength(s.weight, s.width, thk);
+    return `<tr onclick="useSlitFromInv('${s.slitId}')" style="cursor:pointer">
+      <td style="color:var(--accent);font-family:var(--mono)">${s.slitId}</td>
+      <td>${s.width} mm</td>
+      <td>${thk.toFixed(3)} mm</td>
+      <td>${s.weight.toFixed(0)} kg</td>
+      <td>${len.toFixed(0)} m</td>
+      <td>${s.grade || '—'}</td>
+      <td>${s.machine || '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function useSlitFromInv(slitId) {
+  const s = inventoryData.find(x => x.slitId === slitId);
+  if (!s) return;
+  currentSlit = s;
+  simSlit     = s;
+  allProfiles = [];
+  document.getElementById('search-input').value = slitId;
+  renderSlitResult(s);
+  updateSimSlitStrip();
+  loadProfilesForSlit(slitId);
+  switchTab('search');
+  toast('📂 โหลดม้วน: ' + slitId, 'ok');
+}
+
+function clearInvFilter() {
+  document.getElementById('inv-filter-width').value = '';
+  document.getElementById('inv-filter-grade').value = '';
+  renderInventoryTable();
+}
+
+// ═══════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════
+function toast(msg, type = 'ok') {
+  const wrap = document.getElementById('toast-wrap');
+  const el   = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), 3500);
+}
+</script>
+</body>
+</html><!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Slit Tracker — Tube Mill</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:      #0a0e14;
+  --panel:   #111620;
+  --surface: #1a2030;
+  --border:  #253048;
+  --text:    #cdd6f4;
+  --muted:   #6c7a9c;
+  --accent:  #89dceb;
+  --yellow:  #f9e2af;
+  --green:   #a6e3a1;
+  --red:     #f38ba8;
+  --orange:  #fab387;
+  --purple:  #cba6f7;
+  --mono:    'IBM Plex Mono', monospace;
+  --sans:    'Sarabun', sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;min-height:100vh;overflow-x:hidden}
+
+/* ── HEADER ── */
+.header{background:var(--panel);border-bottom:1px solid var(--border);padding:12px 16px;
+  display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.header-left{display:flex;align-items:center;gap:10px}
+.header-icon{width:36px;height:36px;background:linear-gradient(135deg,rgba(137,220,235,.2),rgba(137,220,235,.05));
+  border:1px solid rgba(137,220,235,.4);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.header-title{font-weight:700;font-size:15px;color:var(--text)}
+.header-sub{font-size:10px;color:var(--muted);font-family:var(--mono)}
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── TABS ── */
+.main-tabs{display:flex;gap:6px;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--border)}
+.main-tab{background:var(--surface);border:1px solid var(--border);border-radius:8px;color:var(--muted);
+  font-family:var(--sans);font-size:13px;font-weight:600;padding:8px 0;cursor:pointer;transition:all .15s;flex:1;text-align:center}
+.main-tab.active{background:var(--accent);color:#0a0e14;border-color:var(--accent)}
+
+/* ── TAB CONTENT ── */
+.tab-content{display:none;padding:16px;animation:fadeIn .2s}
+.tab-content.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── CARD ── */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px}
+.card-header{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.card-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono)}
+.card-body{padding:14px}
+
+/* ── INPUTS ── */
+.field{display:flex;flex-direction:column;gap:5px}
+.field-label{font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;font-family:var(--mono)}
+.input-wrap{display:flex;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;transition:border-color .15s}
+.input-wrap:focus-within{border-color:var(--accent)}
+.input-wrap input,.input-wrap select{background:transparent;border:none;outline:none;color:var(--text);
+  font-family:var(--mono);font-size:13px;padding:8px 10px;width:100%;-webkit-appearance:none}
+.input-wrap select option{background:var(--surface)}
+.input-unit{padding:0 10px;font-family:var(--mono);font-size:11px;color:var(--muted);border-left:1px solid var(--border);white-space:nowrap}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+
+/* ── BUTTONS ── */
+.btn{border:none;border-radius:8px;font-family:var(--sans);font-weight:700;font-size:13px;
+  padding:10px 18px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:7px;justify-content:center}
+.btn:active{transform:scale(.97)}
+.btn-primary{background:var(--accent);color:#0a0e14;width:100%;padding:12px;font-size:14px;margin-top:4px}
+.btn-secondary{background:var(--surface);color:var(--text);border:1px solid var(--border)}
+.btn-warn{background:rgba(249,226,175,.15);color:var(--yellow);border:1px solid rgba(249,226,175,.3)}
+.btn-danger{background:rgba(243,139,168,.15);color:var(--red);border:1px solid rgba(243,139,168,.3)}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:6px}
+
+/* ── PIPE TYPE TOGGLE ── */
+.type-toggle{display:flex;gap:6px;margin-bottom:12px}
+.type-btn{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  color:var(--muted);font-family:var(--sans);font-size:12px;font-weight:600;padding:9px 0;
+  cursor:pointer;transition:all .15s;text-align:center}
+.type-btn.active{background:rgba(137,220,235,.15);color:var(--accent);border-color:rgba(137,220,235,.5)}
+
+/* ── SLIT INFO STRIP ── */
+.slit-strip{background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  padding:12px 14px;display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:12px}
+.slit-strip-id{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--accent)}
+.slit-tag{font-family:var(--mono);font-size:11px;padding:3px 8px;border-radius:4px;
+  background:rgba(137,220,235,.08);border:1px solid rgba(137,220,235,.2);color:var(--text)}
+.slit-tag.ok{background:rgba(166,227,161,.08);border-color:rgba(166,227,161,.3);color:var(--green)}
+.slit-tag.warn{background:rgba(249,226,175,.08);border-color:rgba(249,226,175,.3);color:var(--yellow)}
+.slit-tag.no-profile{background:rgba(107,114,128,.1);border-color:rgba(107,114,128,.3);color:var(--muted)}
+
+/* ── SLIT DETAIL CARD ── */
+.slit-detail-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.slit-detail-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 12px}
+.sdl{font-size:9px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
+.sdv{font-family:var(--mono);font-size:15px;font-weight:600;color:var(--text)}
+.sdu{font-size:9px;color:var(--muted);margin-left:2px}
+
+/* ── STATUS BADGE ── */
+.status-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;
+  padding:4px 10px;border-radius:20px;font-weight:600}
+.status-badge.available{background:rgba(166,227,161,.12);color:var(--green);border:1px solid rgba(166,227,161,.3)}
+.status-badge.in-use{background:rgba(249,226,175,.12);color:var(--yellow);border:1px solid rgba(249,226,175,.3)}
+.status-badge.done{background:rgba(107,114,128,.12);color:var(--muted);border:1px solid rgba(107,114,128,.3)}
+
+/* ── KPI CARDS ── */
+.kpi-row{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px}
+.kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;position:relative;overflow:hidden}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kpi-card.accent::before{background:var(--accent)}
+.kpi-card.green::before{background:var(--green)}
+.kpi-card.yellow::before{background:var(--yellow)}
+.kpi-card.red::before{background:var(--red)}
+.kpi-card.purple::before{background:var(--purple)}
+.kpi-label{font-size:9px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px}
+.kpi-value{font-family:var(--mono);font-size:22px;font-weight:600;color:var(--text);line-height:1}
+.kpi-unit{font-size:10px;color:var(--muted);margin-left:3px}
+.kpi-sub{font-size:10px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
+
+/* ── STRIP WIDTH CHECK ── */
+.stripw-check{border-radius:10px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:10px;border:1px solid}
+.stripw-check.ok{background:rgba(166,227,161,.07);border-color:rgba(166,227,161,.25)}
+.stripw-check.warn{background:rgba(243,139,168,.07);border-color:rgba(243,139,168,.25)}
+.stripw-icon{font-size:22px}
+.stripw-info .sw-needed{font-family:var(--mono);font-size:13px;font-weight:600}
+.stripw-info .sw-detail{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* ── CHART ── */
+.chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;overflow:hidden}
+.chart-title{font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px}
+canvas{display:block;width:100%!important;max-height:220px}
+
+/* ── TABLE ── */
+.data-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
+.data-table th{padding:8px 10px;text-align:left;font-size:9px;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.07em;border-bottom:1px solid var(--border);white-space:nowrap}
+.data-table td{padding:7px 10px;border-bottom:1px solid rgba(37,48,72,.5);color:var(--text);white-space:nowrap}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr.warn-row td{color:var(--yellow)}
+.data-table tr.warn-row td:first-child::before{content:'⚠ ';font-size:10px}
+.data-table tr.danger-row td{color:var(--red)}
+.table-scroll{max-height:300px;overflow-y:auto;border-radius:10px;border:1px solid var(--border)}
+.table-scroll::-webkit-scrollbar{width:5px}
+.table-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ── THRESHOLD SOURCE TOGGLE ── */
+.source-toggle{display:flex;gap:6px;margin-bottom:10px}
+.source-btn{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:7px;
+  color:var(--muted);font-size:12px;font-weight:600;padding:7px;cursor:pointer;text-align:center;transition:all .15s}
+.source-btn.active{border-color:rgba(203,166,247,.5);background:rgba(203,166,247,.08);color:var(--purple)}
+
+/* ── CHECKIN PANEL ── */
+.checkin-panel{background:rgba(166,227,161,.04);border:1px solid rgba(166,227,161,.2);
+  border-radius:10px;padding:14px;margin-top:12px}
+.checkin-title{font-size:11px;font-weight:700;color:var(--green);font-family:var(--mono);
+  text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+
+/* ── EMPTY / LOADING ── */
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px}
+.empty-icon{font-size:36px;margin-bottom:10px;opacity:.4}
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid var(--border);
+  border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── ALERT BADGE ── */
+.alert-badge{background:rgba(243,139,168,.1);border:1px solid rgba(243,139,168,.3);
+  border-radius:8px;padding:10px 12px;margin-bottom:10px;display:flex;align-items:flex-start;gap:8px;font-size:12px}
+.alert-badge .icon{font-size:16px;flex-shrink:0}
+
+/* ── INVENTORY FILTER ── */
+.filter-row{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.filter-chip{background:var(--surface);border:1px solid var(--border);border-radius:20px;
+  padding:5px 12px;font-size:11px;color:var(--muted);cursor:pointer;transition:all .15s;font-family:var(--mono)}
+.filter-chip.active{background:rgba(137,220,235,.1);border-color:var(--accent);color:var(--accent)}
+
+/* ── TOAST ── */
+#toast-wrap{position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:var(--surface);border:1px solid var(--border);border-radius:8px;
+  padding:10px 14px;font-size:12px;font-family:var(--mono);animation:slideIn .25s ease;max-width:260px;
+  pointer-events:auto;color:var(--text)}
+.toast.ok{border-color:rgba(166,227,161,.4);color:var(--green)}
+.toast.err{border-color:rgba(243,139,168,.4);color:var(--red)}
+.toast.warn{border-color:rgba(249,226,175,.4);color:var(--yellow)}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:translateX(0)}}
+
+/* ── MISC ── */
+.divider{height:1px;background:var(--border);margin:12px 0}
+.section-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.08em;font-family:var(--mono);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.tag{display:inline-block;font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:4px}
+.tag.pass{background:rgba(166,227,161,.12);color:var(--green);border:1px solid rgba(166,227,161,.3)}
+.tag.fail{background:rgba(243,139,168,.12);color:var(--red);border:1px solid rgba(243,139,168,.3)}
+.tag.warn{background:rgba(249,226,175,.12);color:var(--yellow);border:1px solid rgba(249,226,175,.3)}
+.tag.info{background:rgba(137,220,235,.08);color:var(--accent);border:1px solid rgba(137,220,235,.2)}
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<div class="header">
+  <div class="header-left">
+    <div class="header-icon">🔩</div>
+    <div>
+      <div class="header-title">Slit Tracker</div>
+      <div class="header-sub">TUBE MILL / C-SECTION STATION</div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:11px;color:var(--green)">
+    <div class="status-dot"></div>
+    <span>ONLINE</span>
+  </div>
+</div>
+
+<!-- ── TABS ── -->
+<div class="main-tabs">
+  <div class="main-tab active" onclick="switchTab('search')">🔍 ค้นหา</div>
+  <div class="main-tab" onclick="switchTab('simulate')">🧮 Simulate</div>
+  <div class="main-tab" onclick="switchTab('inventory')">📦 Inventory</div>
+</div>
+
+<!-- ═══════════════════════════════════════════
+     TAB 1: ค้นหา & Check-in
+════════════════════════════════════════════ -->
+<div id="tab-search" class="tab-content active">
+
+  <!-- Search Input -->
+  <div class="card">
+    <div class="card-header"><span class="card-label">🔍 ค้นหา Slit ID</span></div>
+    <div class="card-body">
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <div class="input-wrap" style="flex:1">
+          <input type="text" id="search-input" placeholder="เช่น SL-2401-05" 
+            style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"
+            onkeydown="if(event.key==='Enter')searchSlit()">
+        </div>
+        <button class="btn btn-primary" style="width:auto;margin:0;padding:8px 18px" onclick="searchSlit()">ค้นหา</button>
+      </div>
+      <div id="search-status" style="font-family:var(--mono);font-size:11px;color:var(--muted)">พิมพ์ Slit ID แล้วกดค้นหา</div>
+    </div>
+  </div>
+
+  <!-- Slit Result -->
+  <div id="slit-result" style="display:none">
+    
+    <!-- Info Grid -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-label">📋 ข้อมูลม้วน</span>
+        <span id="slit-status-badge" class="status-badge available" style="margin-left:auto">● AVAILABLE</span>
+      </div>
+      <div class="card-body">
+        <div style="margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span id="result-id" style="font-family:var(--mono);font-size:18px;font-weight:700;color:var(--accent)">—</span>
+          <span id="result-parent" class="slit-tag" style="display:none"></span>
+        </div>
+        <div class="slit-detail-grid">
+          <div class="slit-detail-item"><div class="sdl">หน้ากว้าง</div><div class="sdv" id="r-width">—<span class="sdu">mm</span></div></div>
+          <div class="slit-detail-item"><div class="sdl">ความหนา (Nom.)</div><div class="sdv" id="r-thk">—<span class="sdu">mm</span></div></div>
+          <div class="slit-detail-item"><div class="sdl">น้ำหนัก</div><div class="sdv" id="r-weight">—<span class="sdu">kg</span></div></div>
+          <div class="slit-detail-item"><div class="sdl">ความยาว (คำนวณ)</div><div class="sdv" id="r-length">—<span class="sdu">m</span></div></div>
+          <div class="slit-detail-item"><div class="sdl">เกรด</div><div class="sdv" id="r-grade">—</div></div>
+          <div class="slit-detail-item"><div class="sdl">เครื่องที่ผลิต</div><div class="sdv" id="r-machine">—</div></div>
+        </div>
+
+        <!-- Thickness Profile info -->
+        <div id="profile-info-row" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <span style="font-size:11px;color:var(--muted)">Thickness Profile:</span>
+          <span id="profile-badge" class="slit-tag no-profile">ยังไม่มี Profile</span>
+          <button id="btn-load-profile" class="btn btn-secondary btn-sm" style="display:none" onclick="loadProfileForSlit()">📂 โหลด Profile</button>
+        </div>
+
+        <!-- Actions -->
+        <div class="checkin-panel">
+          <div class="checkin-title">✅ Check-in ม้วนนี้</div>
+          <div class="grid2" style="margin-bottom:10px">
+            <div class="field">
+              <div class="field-label">เครื่องที่ใช้งาน</div>
+              <div class="input-wrap">
+                <select id="checkin-machine">
+                  <option value="">— เลือกเครื่อง —</option>
+                </select>
+              </div>
+            </div>
+            <div class="field">
+              <div class="field-label">ชื่อผู้รับม้วน</div>
+              <div class="input-wrap">
+                <input type="text" id="checkin-operator" placeholder="ชื่อ-นามสกุล">
+              </div>
+            </div>
+          </div>
+          <div class="field" style="margin-bottom:10px">
+            <div class="field-label">หมายเหตุ (ถ้ามี)</div>
+            <div class="input-wrap">
+              <input type="text" id="checkin-note" placeholder="เช่น งานด่วน, สต็อก TM3">
+            </div>
+          </div>
+          <button class="btn btn-primary" onclick="doCheckIn()">✅ บันทึก Check-in</button>
+        </div>
+
+        <!-- Simulate shortcut -->
+        <button class="btn btn-warn" style="width:100%;margin-top:10px" onclick="gotoSimulate()">
+          🧮 ไป Simulate ด้วยม้วนนี้ →
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /slit-result -->
+</div><!-- /tab-search -->
+
+
+<!-- ═══════════════════════════════════════════
+     TAB 2: Simulate
+════════════════════════════════════════════ -->
+<div id="tab-simulate" class="tab-content">
+
+  <!-- Slit Source -->
+  <div class="card">
+    <div class="card-header"><span class="card-label">🔩 Slit ที่จะใช้ผลิต</span></div>
+    <div class="card-body">
+      <div id="sim-slit-strip" class="slit-strip" style="display:none"></div>
+      <div id="sim-no-slit" style="font-size:12px;color:var(--muted);margin-bottom:10px">
+        ยังไม่ได้เลือกม้วน — ค้นหาจาก Tab ค้นหา หรือกรอก ID ด้านล่าง
+      </div>
+      <div style="display:flex;gap:8px">
+        <div class="input-wrap" style="flex:1">
+          <input type="text" id="sim-slit-input" placeholder="Slit ID" 
+            style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="loadSlitForSim()">โหลด</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pipe Setup -->
+  <div class="card">
+    <div class="card-header"><span class="card-label">⚙️ ตั้งค่าท่อที่จะผลิต</span></div>
+    <div class="card-body">
+      <!-- Type Toggle -->
+      <div class="type-toggle">
+        <div class="type-btn active" id="ptype-round" onclick="setPipeType('round')">● Round</div>
+        <div class="type-btn" id="ptype-square" onclick="setPipeType('square')">■ Square</div>
+        <div class="type-btn" id="ptype-rect" onclick="setPipeType('rect')">▭ Rect</div>
+      </div>
+
+      <!-- Round fields -->
+      <div id="fields-round" class="grid2" style="margin-bottom:10px">
+        <div class="field">
+          <div class="field-label">OD (เส้นผ่านศูนย์กลาง)</div>
+          <div class="input-wrap"><input type="number" id="pipe-od" value="60.3" step="0.1"><span class="input-unit">mm</span></div>
+        </div>
+        <div class="field">
+          <div class="field-label">Wall Thickness</div>
+          <div class="input-wrap"><input type="number" id="pipe-wt" value="2.9" step="0.1"><span class="input-unit">mm</span></div>
+        </div>
+      </div>
+
+      <!-- Square fields -->
+      <div id="fields-square" class="grid3" style="margin-bottom:10px;display:none">
+        <div class="field">
+          <div class="field-label">ขนาด (A×A)</div>
+          <div class="input-wrap"><input type="number" id="pipe-sq-a" value="50" step="1"><span class="input-unit">mm</span></div>
+        </div>
+        <div class="field">
+          <div class="field-label">Wall Thickness</div>
+          <div class="input-wrap"><input type="number" id="pipe-sq-t" value="2.5" step="0.1"><span class="input-unit">mm</span></div>
+        </div>
+        <div class="field">
+          <div class="field-label">Corner Radius</div>
+          <div class="input-wrap"><input type="number" id="pipe-sq-r" value="5.5" step="0.5"><span class="input-unit">mm</span></div>
+        </div>
+      </div>
+
+      <!-- Rect fields -->
+      <div id="fields-rect" class="grid2" style="margin-bottom:10px;display:none">
+        <div class="field">
+          <div class="field-label">Height (H)</div>
+          <div class="input-wrap"><input type="number" id="pipe-rh" value="80" step="1"><span class="input-unit">mm</span></div>
+        </div>
+        <div class="field">
+          <div class="field-label">Width (B)</div>
+          <div class="input-wrap"><input type="number" id="pipe-rb" value="40" step="1"><span class="input-unit">mm</span></div>
+        </div>
+        <div class="field" style="margin-bottom:10px">
+          <div class="field-label">Wall Thickness</div>
+          <div class="input-wrap"><input type="number" id="pipe-rt" value="3.0" step="0.1"><span class="input-unit">mm</span></div>
+        </div>
+        <div class="field" style="margin-bottom:10px">
+          <div class="field-label">Corner Radius</div>
+          <div class="input-wrap"><input type="number" id="pipe-rr" value="6.5" step="0.5"><span class="input-unit">mm</span></div>
+        </div>
+      </div>
+
+      <!-- Length per piece -->
+      <div class="field">
+        <div class="field-label">ความยาวต่อเส้น</div>
+        <div class="input-wrap"><input type="number" id="pipe-len" value="6000" step="100"><span class="input-unit">mm</span></div>
+      </div>
+
+      <!-- Weight tolerance -->
+      <div class="field" style="margin-top:10px">
+        <div class="field-label">เกณฑ์น้ำหนักเบี่ยงเบน (เตือน)</div>
+        <div class="input-wrap">
+          <input type="number" id="weight-tol" value="10" step="1" min="1" max="30">
+          <span class="input-unit">%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Thickness Source -->
+  <div class="card">
+    <div class="card-header"><span class="card-label">📐 แหล่งข้อมูลความหนา</span></div>
+    <div class="card-body">
+      <div class="source-toggle">
+        <div class="source-btn active" id="src-profile" onclick="setThkSource('profile')">📊 Profile Log</div>
+        <div class="source-btn" id="src-nominal" onclick="setThkSource('nominal')">📋 Nominal</div>
+        <div class="source-btn" id="src-both" onclick="setThkSource('both')">⚖️ เปรียบเทียบ</div>
+      </div>
+      <div id="profile-select-row" style="margin-bottom:0">
+        <div class="field">
+          <div class="field-label">เลือก Thickness Profile</div>
+          <div class="input-wrap">
+            <select id="profile-select" onchange="onProfileSelect()">
+              <option value="">— ค้นหาม้วนก่อน —</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div id="profile-loaded-info" style="display:none;margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--muted)"></div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" onclick="runSimulate()" style="margin-bottom:14px">
+    🧮 คำนวณ Simulate
+  </button>
+
+  <!-- Results (hidden until simulate) -->
+  <div id="sim-results" style="display:none">
+    
+    <!-- Strip Width Check -->
+    <div id="stripw-check-box" class="stripw-check ok">
+      <div class="stripw-icon">✅</div>
+      <div class="stripw-info">
+        <div class="sw-needed" id="sw-needed-text">Strip Width ต้องการ: — mm</div>
+        <div class="sw-detail" id="sw-detail-text">—</div>
+      </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-row" style="grid-template-columns:repeat(2,1fr)">
+      <div class="kpi-card accent">
+        <div class="kpi-label">ท่อทั้งหมด</div>
+        <div class="kpi-value" id="kpi-total-pipes">—<span class="kpi-unit">เส้น</span></div>
+        <div class="kpi-sub" id="kpi-coil-len">ความยาวม้วน: — m</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">น้ำหนักเฉลี่ย/เส้น</div>
+        <div class="kpi-value" id="kpi-avg-weight">—<span class="kpi-unit">kg</span></div>
+        <div class="kpi-sub" id="kpi-weight-range">Min — Max — kg</div>
+      </div>
+    </div>
+    <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi-card yellow">
+        <div class="kpi-label">น้ำหนัก Min</div>
+        <div class="kpi-value" id="kpi-min-w" style="font-size:16px">—<span class="kpi-unit">kg</span></div>
+      </div>
+      <div class="kpi-card red">
+        <div class="kpi-label">น้ำหนัก Max</div>
+        <div class="kpi-value" id="kpi-max-w" style="font-size:16px">—<span class="kpi-unit">kg</span></div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-label">เส้นเกินเกณฑ์</div>
+        <div class="kpi-value" id="kpi-warn-count" style="font-size:16px">—<span class="kpi-unit">เส้น</span></div>
+      </div>
+    </div>
+
+    <!-- Weight Chart -->
+    <div class="chart-wrap">
+      <div class="chart-title">📈 น้ำหนักคาดการณ์รายเส้น (kg)</div>
+      <canvas id="weight-chart" height="180"></canvas>
+      <div style="display:flex;gap:12px;margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--muted)">
+        <span>─ <span style="color:var(--accent)">Profile</span></span>
+        <span>─ <span style="color:var(--green)">Nominal</span></span>
+        <span>--- <span style="color:var(--red)">เกณฑ์ ±</span><span id="chart-legend-tol">10</span>%</span>
+      </div>
+    </div>
+
+    <!-- Alerts -->
+    <div id="weight-alerts" style="display:none"></div>
+
+    <!-- Table -->
+    <div class="section-title">📋 ตารางน้ำหนักรายเส้น</div>
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>เส้น#</th>
+            <th>ตำแหน่ง (m)</th>
+            <th>หนาเฉลี่ย</th>
+            <th>น้ำหนัก (Profile)</th>
+            <th id="th-nom-col">น้ำหนัก (Nom.)</th>
+            <th>Δ%</th>
+            <th>สถานะ</th>
+          </tr>
+        </thead>
+        <tbody id="sim-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div><!-- /tab-simulate -->
+
+
+<!-- ═══════════════════════════════════════════
+     TAB 3: Inventory
+════════════════════════════════════════════ -->
+<div id="tab-inventory" class="tab-content">
+  
+  <!-- Filters -->
+  <div class="card">
+    <div class="card-header"><span class="card-label">🔎 ค้นหา / กรอง</span></div>
+    <div class="card-body">
+      <div class="grid2" style="margin-bottom:10px">
+        <div class="field">
+          <div class="field-label">หน้ากว้าง (Width)</div>
+          <div class="input-wrap">
+            <select id="inv-filter-width">
+              <option value="">ทั้งหมด</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <div class="field-label">เกรดเหล็ก</div>
+          <div class="input-wrap">
+            <select id="inv-filter-grade">
+              <option value="">ทั้งหมด</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary btn-sm" style="flex:1" onclick="loadInventory()">🔄 โหลดข้อมูล</button>
+        <button class="btn btn-secondary btn-sm" style="flex:1" onclick="clearInvFilter()">✕ ล้างตัวกรอง</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Summary -->
+  <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
+    <div class="kpi-card accent">
+      <div class="kpi-label">ม้วนทั้งหมด</div>
+      <div class="kpi-value" id="inv-total">—</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="kpi-label">น้ำหนักรวม</div>
+      <div class="kpi-value" id="inv-weight" style="font-size:16px">—<span class="kpi-unit">kg</span></div>
+    </div>
+    <div class="kpi-card yellow">
+      <div class="kpi-label">กำลังใช้งาน</div>
+      <div class="kpi-value" id="inv-in-use">—<span class="kpi-unit">ม้วน</span></div>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div id="inv-loading" class="empty-state">
+    <div class="empty-icon">📦</div>
+    <div>กด "โหลดข้อมูล" เพื่อดู Inventory</div>
+  </div>
+
+  <div id="inv-table-wrap" style="display:none">
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Slit ID</th>
+            <th>Width</th>
+            <th>Thk</th>
+            <th>Weight</th>
+            <th>Length (calc)</th>
+            <th>Grade</th>
+            <th>Machine</th>
+          </tr>
+        </thead>
+        <tbody id="inv-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div><!-- /tab-inventory -->
+
+<div id="toast-wrap"></div>
+
+<script>
+// ═══════════════════════════════════════════
+// CONFIG — แก้ URL เป็น GAS Deployment URL จริงของคุณ
+// ═══════════════════════════════════════════
 const GAS_URL = 'https://script.google.com/macros/s/AKfycbxgqHXHx-dxexgoQYYMqvHstqCWbXyrT3oMUzUxzuEX9g_96qyQMUlMvJw0zakDJEbQtA/exec';
 
 // Machine list — sync กับ Config sheet หรือกรอกตรงนี้
@@ -617,11 +1914,16 @@ let inventoryData  = [];
 // ═══════════════════════════════════════════
 // GAS CALL
 // ═══════════════════════════════════════════
+// ── GAS CALL ──────────────────────────────────────────────────────────
+// สำคัญ: ไม่ต้องใส่ Content-Type header เลย
+// เพราะ GAS ไม่รองรับ CORS preflight (OPTIONS)
+// การไม่ใส่ header ทำให้ browser ส่งเป็น "simple request" → ไม่มี preflight
+// ──────────────────────────────────────────────────────────────────────
 function callGAS(action, args = []) {
   return fetch(GAS_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'text/plain' },
     body: JSON.stringify({ action, args })
+    // ❌ อย่าใส่ headers: { 'Content-Type': ... } — จะทำให้ CORS preflight fail
   }).then(r => r.json());
 }
 
