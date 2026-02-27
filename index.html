@@ -6043,8 +6043,8 @@ function updateLegendDisplay(index, log) {
           const _orig = typeof switchScreen === 'function' ? switchScreen : null;
           window.switchScreen = function(id) {
             if (_orig) _orig(id);
-            // แสดง FAB เฉพาะหน้า Home (screen-select) และ Queue (screen-queue)
-            const showFab = (id === 'screen-select' || id === 'screen-queue');
+            // แสดง FAB ที่หน้า Home, Queue และ Running — ซ่อนเฉพาะ Dashboard
+            const showFab = (id === 'screen-select' || id === 'screen-queue' || id === 'screen-running');
             document.getElementById('fab-thk').style.display = showFab ? 'block' : 'none';
           };
           // ตอน load: ถ้า screen-select active อยู่แล้ว ให้แสดง FAB เลย
@@ -6053,18 +6053,22 @@ function updateLegendDisplay(index, log) {
           }
         })();
         
-        // เปิด Thk Profile — ส่ง URL params ถ้ามี job ที่กำลัง running อยู่
+        // เปิด Thk Profile — ส่ง URL params จาก CURRENT_JOB_INFO ถ้ามี
         function openThkProfile() {
           const params = new URLSearchParams({ mode: 'new' });
-        
-          // ถ้าอยู่หน้า Queue มี job ที่เลือกไว้ ให้ส่ง jobId + spec ไปด้วย
-          if (typeof currentJob !== 'undefined' && currentJob) {
-            if (currentJob.jobId)    params.set('jobId',  currentJob.jobId);
-            if (currentJob.thickness) {
-              params.set('target', currentJob.thickness);
-              // ดึง spec max/min จาก standards ถ้ามี
-              if (typeof appData !== 'undefined' && appData.standards) {
-                const std = appData.standards.find(s => Math.abs(Number(s.thick) - Number(currentJob.thickness)) < 0.001);
+
+          if (CURRENT_JOB_INFO) {
+            if (CURRENT_JOB_INFO.jobId)
+              params.set('jobId', CURRENT_JOB_INFO.jobId);
+
+            if (CURRENT_JOB_INFO.thickness) {
+              params.set('target', CURRENT_JOB_INFO.thickness);
+
+              // ดึง spec max/min จาก ALL_DATA.standards
+              if (ALL_DATA && ALL_DATA.standards) {
+                const std = ALL_DATA.standards.find(
+                  s => Math.abs(Number(s.thick) - Number(CURRENT_JOB_INFO.thickness)) < 0.001
+                );
                 if (std) {
                   if (std.max) params.set('max', std.max);
                   if (std.min) params.set('min', std.min);
@@ -6072,7 +6076,7 @@ function updateLegendDisplay(index, log) {
               }
             }
           }
-        
+
           window.open(THK_PROFILE_URL + '?' + params.toString(), '_blank');
         }      
 
@@ -6118,6 +6122,3 @@ function updateLegendDisplay(index, log) {
 
   </body>
 </html>
-
-
-
