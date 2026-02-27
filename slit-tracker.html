@@ -169,11 +169,19 @@ canvas{display:block;width:100%!important;max-height:220px}
 .table-scroll::-webkit-scrollbar{width:5px}
 .table-scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
-/* ── THRESHOLD SOURCE TOGGLE ── */
+/* ── SOURCE TOGGLE ── */
 .source-toggle{display:flex;gap:6px;margin-bottom:10px}
 .source-btn{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:7px;
-  color:var(--muted);font-size:12px;font-weight:600;padding:7px;cursor:pointer;text-align:center;transition:all .15s}
+  color:var(--muted);font-size:11px;font-weight:600;padding:7px 4px;cursor:pointer;text-align:center;transition:all .15s}
 .source-btn.active{border-color:rgba(203,166,247,.5);background:rgba(203,166,247,.08);color:var(--purple)}
+.source-btn.surface-active{border-color:rgba(137,220,235,.5);background:rgba(137,220,235,.08);color:var(--accent)}
+
+/* ── SURFACE MODEL CARD ── */
+.surface-model-card{background:var(--panel);border:1px solid rgba(137,220,235,.25);border-radius:12px;overflow:hidden;margin-bottom:14px}
+.surface-model-header{padding:10px 14px;border-bottom:1px solid rgba(37,48,72,.8);display:flex;align-items:center;justify-content:space-between}
+.sm-ready{background:rgba(137,220,235,.06)}
+.parent-strip-wrap{padding:10px 12px 4px;position:relative}
+#parent-strip-canvas{display:block;width:100%;border-radius:4px;background:rgba(10,14,20,.5)}
 
 /* ── CHECKIN PANEL ── */
 .checkin-panel{background:rgba(166,227,161,.04);border:1px solid rgba(166,227,161,.2);
@@ -357,6 +365,47 @@ canvas{display:block;width:100%!important;max-height:220px}
     </div>
   </div>
 
+  <!-- Surface Model Card -->
+  <div class="surface-model-card" id="surface-model-card">
+    <div class="surface-model-header">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:15px">🌐</span>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono)">2D Surface Model</div>
+          <div style="font-size:10px;color:var(--muted);font-family:var(--mono)" id="sm-header-sub">จำลองความหนาจาก Parent Coil 15 จุด</div>
+        </div>
+      </div>
+      <span id="surface-model-badge" class="slit-tag no-profile">ยังไม่โหลด</span>
+    </div>
+    <!-- Parent strip visual -->
+    <div class="parent-strip-wrap">
+      <canvas id="parent-strip-canvas" height="62"></canvas>
+    </div>
+    <!-- Info grid (hidden until loaded) -->
+    <div id="surface-model-info" style="display:none;padding:0 12px 10px">
+      <div class="grid3" style="margin-bottom:8px">
+        <div class="slit-detail-item">
+          <div class="sdl">Parent Width</div>
+          <div class="sdv" id="sm-parent-width">—<span class="sdu">mm</span></div>
+        </div>
+        <div class="slit-detail-item">
+          <div class="sdl">Slit Center</div>
+          <div class="sdv" id="sm-slit-center">—<span class="sdu">mm</span></div>
+        </div>
+        <div class="slit-detail-item">
+          <div class="sdl">Longi. Model</div>
+          <div class="sdv" id="sm-model-name" style="font-size:12px">—</div>
+        </div>
+      </div>
+      <div id="sm-r2-row" style="font-family:var(--mono);font-size:10px;color:var(--muted)"></div>
+    </div>
+    <div style="padding:0 12px 12px">
+      <button class="btn btn-secondary btn-sm" style="width:100%" id="btn-load-surface" onclick="loadParentSurface()">
+        🌐 โหลด Surface Model จาก Parent Coil
+      </button>
+    </div>
+  </div>
+
   <!-- Pipe Setup -->
   <div class="card">
     <div class="card-header"><span class="card-label">⚙️ ตั้งค่าท่อที่จะผลิต</span></div>
@@ -438,9 +487,10 @@ canvas{display:block;width:100%!important;max-height:220px}
     <div class="card-header"><span class="card-label">📐 แหล่งข้อมูลความหนา</span></div>
     <div class="card-body">
       <div class="source-toggle">
-        <div class="source-btn active" id="src-profile" onclick="setThkSource('profile')">📊 Profile Log</div>
+        <div class="source-btn" id="src-surface" onclick="setThkSource('surface')">🌐 Surface</div>
+        <div class="source-btn active" id="src-profile" onclick="setThkSource('profile')">📊 Profile</div>
         <div class="source-btn" id="src-nominal" onclick="setThkSource('nominal')">📋 Nominal</div>
-        <div class="source-btn" id="src-both" onclick="setThkSource('both')">⚖️ เปรียบเทียบ</div>
+        <div class="source-btn" id="src-both" onclick="setThkSource('both')">⚖️ เปรียบ</div>
       </div>
       <div id="profile-select-row" style="margin-bottom:0">
         <div class="field">
@@ -469,6 +519,18 @@ canvas{display:block;width:100%!important;max-height:220px}
       <div class="stripw-info">
         <div class="sw-needed" id="sw-needed-text">Strip Width ต้องการ: — mm</div>
         <div class="sw-detail" id="sw-detail-text">—</div>
+      </div>
+    </div>
+
+    <!-- Surface Model Quality Row -->
+    <div id="surface-quality-row" style="display:none;margin-bottom:12px">
+      <div style="background:rgba(137,220,235,.04);border:1px solid rgba(137,220,235,.2);border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:10px">
+        <span style="font-size:16px">🌐</span>
+        <div style="flex:1">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--accent);font-weight:700;margin-bottom:2px" id="sq-title">Surface Model Active</div>
+          <div style="font-family:var(--mono);font-size:10px;color:var(--muted)" id="sq-detail">—</div>
+        </div>
+        <span id="sq-r2-badge" class="tag info">R²=—</span>
       </div>
     </div>
 
@@ -669,6 +731,8 @@ let simThkSource   = 'profile';
 let loadedProfile  = null;   // profile object จาก Thk_Profile_Log
 let allProfiles    = [];     // รายการ profiles ของม้วนปัจจุบัน
 let inventoryData  = [];
+let surfaceModel   = null;   // 2D surface model จาก parent 15-pt data
+let parentSurfaceData = null; // raw data จาก GAS
 
 // ═══════════════════════════════════════════
 // GAS CALL
@@ -764,6 +828,262 @@ function calcPipeWeightPerM() {
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// 2D THICKNESS SURFACE MODEL
+// Build จาก Parent Coil 15 จุด (5 ตำแหน่งยาว × 3 ตำแหน่งขวาง L/C/R)
+// ═══════════════════════════════════════════════════════════════════════
+
+// ── Quadratic Lagrange interpolation ผ่าน 3 จุดพอดี ────────────────────
+// pts = [{x,y},{x,y},{x,y}]  →  fn(x) = quadratic passing exactly through pts
+function quadLagrange3(pts) {
+  const [p0,p1,p2] = pts;
+  return x =>
+    p0.y*(x-p1.x)*(x-p2.x)/((p0.x-p1.x)*(p0.x-p2.x)) +
+    p1.y*(x-p0.x)*(x-p2.x)/((p1.x-p0.x)*(p1.x-p2.x)) +
+    p2.y*(x-p0.x)*(x-p1.x)/((p2.x-p0.x)*(p2.x-p1.x));
+}
+
+// ── Linear least-squares ────────────────────────────────────────────────
+function fitLinear(xs, ys) {
+  const n = xs.length;
+  const sx=xs.reduce((a,b)=>a+b,0), sy=ys.reduce((a,b)=>a+b,0);
+  const sxy=xs.reduce((a,x,i)=>a+x*ys[i],0), sxx=xs.reduce((a,x)=>a+x*x,0);
+  const D = n*sxx-sx*sx;
+  if (Math.abs(D)<1e-12) return {fn:_=>sy/n, name:'Linear'};
+  const b=(n*sxy-sx*sy)/D, a=(sy-b*sx)/n;
+  return {fn: x=>a+b*x, name:'Linear'};
+}
+
+// ── Quadratic least-squares (degree 2, 3×3 normal equations) ───────────
+function fitQuadratic(xs, ys) {
+  const n=xs.length;
+  const s=[0,0,0,0,0], t=[0,0,0];
+  for (let i=0;i<n;i++) {
+    const x=xs[i],y=ys[i];
+    s[0]+=1;s[1]+=x;s[2]+=x*x;s[3]+=x*x*x;s[4]+=x*x*x*x;
+    t[0]+=y;t[1]+=x*y;t[2]+=x*x*y;
+  }
+  const M=[ [s[0],s[1],s[2],t[0]], [s[1],s[2],s[3],t[1]], [s[2],s[3],s[4],t[2]] ];
+  for (let i=0;i<3;i++) {
+    let mx=i;
+    for (let k=i+1;k<3;k++) if(Math.abs(M[k][i])>Math.abs(M[mx][i])) mx=k;
+    [M[i],M[mx]]=[M[mx],M[i]];
+    if (Math.abs(M[i][i])<1e-14) return fitLinear(xs,ys);
+    for (let k=i+1;k<3;k++) {
+      const f=M[k][i]/M[i][i];
+      for (let j=i;j<=3;j++) M[k][j]-=f*M[i][j];
+    }
+  }
+  const a=new Array(3);
+  for (let i=2;i>=0;i--) {
+    a[i]=M[i][3];
+    for (let j=i+1;j<3;j++) a[i]-=M[i][j]*a[j];
+    a[i]/=M[i][i];
+  }
+  return {fn: x=>a[0]+a[1]*x+a[2]*x*x, name:'Quadratic'};
+}
+
+// ── Natural cubic spline (tridiagonal Thomas algorithm) ─────────────────
+function naturalCubicSpline(xs, ys) {
+  const n = xs.length-1;
+  if (n<1) return {fn:_=>ys[0], name:'Spline'};
+  if (n===1) { const sl=(ys[1]-ys[0])/(xs[1]-xs[0]); return {fn:x=>ys[0]+sl*(x-xs[0]),name:'Spline'}; }
+  const h=Array.from({length:n},(_,i)=>xs[i+1]-xs[i]);
+  const alpha=Array.from({length:n-1},(_,i)=>
+    3*(ys[i+2]-ys[i+1])/h[i+1]-3*(ys[i+1]-ys[i])/h[i]);
+  const l=[1],mu=[0],z=[0];
+  for (let i=1;i<n;i++) {
+    l.push(2*(xs[i+1]-xs[i-1])-h[i-1]*mu[i-1]);
+    mu.push(h[i]/l[i]);
+    z.push((alpha[i-1]-h[i-1]*z[i-1])/l[i]);
+  }
+  l.push(1); z.push(0);
+  const c=new Array(n+1).fill(0);
+  for (let j=n-1;j>=0;j--) c[j]=z[j]-mu[j]*c[j+1];
+  const b=Array.from({length:n},(_,i)=>(ys[i+1]-ys[i])/h[i]-h[i]*(c[i+1]+2*c[i])/3);
+  const d=Array.from({length:n},(_,i)=>(c[i+1]-c[i])/(3*h[i]));
+  const fn = x => {
+    let i=n-1;
+    for (let k=0;k<n-1;k++) { if(x<xs[k+1]){i=k;break;} }
+    if (x<=xs[0]) i=0; if (x>=xs[n]) i=n-1;
+    const dx=x-xs[i];
+    return ys[i]+b[i]*dx+c[i]*dx*dx+d[i]*dx*dx*dx;
+  };
+  return {fn, name:'Cubic Spline'};
+}
+
+// ── R² coefficient of determination ────────────────────────────────────
+function calcR2(xs, ys, fn) {
+  const mean=ys.reduce((a,b)=>a+b,0)/ys.length;
+  const ssTot=ys.reduce((a,y)=>a+(y-mean)**2,0);
+  const ssRes=xs.reduce((a,x,i)=>a+(ys[i]-fn(x))**2,0);
+  return ssTot<1e-14 ? 1 : Math.max(0, 1-ssRes/ssTot);
+}
+
+// ── Auto-select best longitudinal fit (Linear / Quad / Spline) ─────────
+function autoFitLongitudinal(posArr, thkArr) {
+  const candidates=[fitLinear(posArr,thkArr), fitQuadratic(posArr,thkArr), naturalCubicSpline(posArr,thkArr)];
+  let best=candidates[0], bestR2=calcR2(posArr,thkArr,best.fn);
+  for (let i=1;i<candidates.length;i++) {
+    const r2=calcR2(posArr,thkArr,candidates[i].fn);
+    if (r2>bestR2) { bestR2=r2; best=candidates[i]; }
+  }
+  return {...best, r2:bestR2};
+}
+
+// ── Build 2D Surface Model ──────────────────────────────────────────────
+// parentData : { parentWidth, measurements:[{pos_m,tL,tC,tR}×5], siblings:[{slitNo,slitId,width}] }
+// targetSlit : { slitNo, width }
+function buildSurfaceModel(parentData, targetSlit) {
+  const {parentWidth, measurements, siblings} = parentData;
+
+  // ── ตำแหน่ง L/C/R ในแผ่น Parent (mm) ────────────────────────────────
+  const xL = 25;
+  const xC = parentWidth / 2;
+  const xR = parentWidth - 25;
+
+  // ── คำนวณ x_center ของม้วน Slit นี้ ─────────────────────────────────
+  const sorted = [...siblings].sort((a,b) => a.slitNo-b.slitNo);
+  let xLeft = 0;
+  for (const s of sorted) {
+    if (s.slitNo === targetSlit.slitNo) break;
+    xLeft += s.width;
+  }
+  const xCenter = xLeft + targetSlit.width/2;
+
+  // ── สำหรับแต่ละตำแหน่งยาว: fit transverse quadratic → sample ที่ xCenter ──
+  const meas = [...measurements].sort((a,b) => a.pos_m-b.pos_m);
+  const posArr    = meas.map(m => m.pos_m);
+  const thkCenter = meas.map(m => {
+    const fn = quadLagrange3([{x:xL,y:m.tL},{x:xC,y:m.tC},{x:xR,y:m.tR}]);
+    // clamp output — ไม่ให้ต่ำกว่า 0.5mm หรือสูงกว่า 20mm
+    return Math.max(0.5, Math.min(20, fn(xCenter)));
+  });
+
+  // ── Build longitudinal model (auto-select best) ───────────────────────
+  const longi = autoFitLongitudinal(posArr, thkCenter);
+  const coilLen = posArr[posArr.length-1];
+
+  return {
+    thkAt: pos_m => {
+      const clamped = Math.max(posArr[0], Math.min(coilLen, pos_m));
+      return Math.max(0.5, longi.fn(clamped));
+    },
+    xCenter, parentWidth, xL, xC, xR,
+    slitWidth: targetSlit.width,
+    modelName: longi.name,
+    r2: longi.r2,
+    posArr, thkCenter,
+    coilLen
+  };
+}
+
+// ── Sample surface model over a range (N จุด) ───────────────────────────
+function sampleSurface(model, startM, endM, N=20) {
+  const step=(endM-startM)/N;
+  let sum=0;
+  for (let i=0;i<=N;i++) sum+=model.thkAt(startM+step*i);
+  return sum/(N+1);
+}
+
+// ── Load Parent Surface Data from GAS ───────────────────────────────────
+function loadParentSurface() {
+  if (!simSlit) { toast('โหลดม้วนก่อนครับ','warn'); return; }
+  if (!simSlit.parentId) { toast('ม้วนนี้ไม่มี Parent ID','warn'); return; }
+  if (!simSlit.slitNo)   { toast('ม้วนนี้ไม่มี Slit No. — กรุณาเพิ่มข้อมูลใน Inventory','warn'); return; }
+
+  const btn = document.getElementById('btn-load-surface');
+  btn.innerHTML = '<span class="spinner"></span> กำลังโหลด...';
+
+  callGAS('getParentSurfaceData', [simSlit.parentId])
+    .then(res => {
+      btn.innerHTML = '🔄 โหลดใหม่';
+      if (res.error || !res.result) {
+        toast('ไม่พบข้อมูล Surface จาก ' + simSlit.parentId, 'err'); return;
+      }
+      parentSurfaceData = res.result;
+      const target = { slitNo: simSlit.slitNo, width: simSlit.width };
+      surfaceModel = buildSurfaceModel(parentSurfaceData, target);
+      updateSurfaceModelUI();
+      toast(`✅ Surface Model พร้อม: ${surfaceModel.modelName} R²=${surfaceModel.r2.toFixed(4)}`, 'ok');
+      // auto-switch source to surface
+      setThkSource('surface');
+    })
+    .catch(() => { btn.innerHTML='🌐 โหลด Surface Model จาก Parent Coil'; toast('❌ GAS error','err'); });
+}
+
+// ── Update Surface Model UI ──────────────────────────────────────────────
+function updateSurfaceModelUI() {
+  if (!surfaceModel) return;
+  const card  = document.getElementById('surface-model-card');
+  const badge = document.getElementById('surface-model-badge');
+  card.classList.add('sm-ready');
+  badge.className='slit-tag ok';
+  badge.textContent=`✅ ${surfaceModel.modelName}`;
+  document.getElementById('sm-parent-width').innerHTML=`<b>${surfaceModel.parentWidth}</b><span class="sdu">mm</span>`;
+  document.getElementById('sm-slit-center').innerHTML=`<b>${surfaceModel.xCenter.toFixed(1)}</b><span class="sdu">mm</span>`;
+  document.getElementById('sm-model-name').textContent=surfaceModel.modelName;
+  document.getElementById('sm-r2-row').innerHTML=
+    `R² = <span style="color:${surfaceModel.r2>0.99?'var(--green)':surfaceModel.r2>0.95?'var(--yellow)':'var(--red)'}">${surfaceModel.r2.toFixed(5)}</span>` +
+    ` | ${surfaceModel.posArr.length} จุดยาว | xCenter ${surfaceModel.xCenter.toFixed(1)} mm จากขอบซ้ายแผ่น`;
+  document.getElementById('surface-model-info').style.display='block';
+  drawParentStripIndicator();
+}
+
+// ── Draw Parent Strip Indicator canvas ──────────────────────────────────
+function drawParentStripIndicator() {
+  if (!surfaceModel) return;
+  const canvas = document.getElementById('parent-strip-canvas');
+  const W = canvas.parentElement.clientWidth - 24;
+  const H = 62;
+  canvas.width=W; canvas.height=H;
+  const ctx=canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  const {parentWidth, xCenter, slitWidth, xL, xC, xR} = surfaceModel;
+  function toX(mm) { return Math.max(0, Math.min(W, (mm/parentWidth)*W)); }
+
+  // Parent coil background
+  ctx.fillStyle='rgba(37,48,72,.5)';
+  ctx.beginPath(); ctx.roundRect(0,14,W,30,4); ctx.fill();
+  ctx.strokeStyle='rgba(107,120,150,.3)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.roundRect(0,14,W,30,4); ctx.stroke();
+
+  // Slit highlight
+  const sxL=toX(xCenter-slitWidth/2), sxR=toX(xCenter+slitWidth/2);
+  ctx.fillStyle='rgba(137,220,235,.2)';
+  ctx.fillRect(sxL,14,sxR-sxL,30);
+  ctx.strokeStyle='rgba(137,220,235,.7)'; ctx.lineWidth=1.5;
+  ctx.strokeRect(sxL,14,sxR-sxL,30);
+
+  // Slit center label
+  ctx.fillStyle='#89dceb'; ctx.font='bold 9px IBM Plex Mono,monospace'; ctx.textAlign='center';
+  ctx.fillText(`${xCenter.toFixed(0)}mm`, (sxL+sxR)/2, 33);
+
+  // L/C/R measurement markers
+  const markers=[{x:xL,col:'#89dceb',lbl:'L'},{x:xC,col:'#a6e3a1',lbl:'C'},{x:xR,col:'#f9e2af',lbl:'R'}];
+  markers.forEach(m => {
+    const mx=toX(m.x);
+    ctx.strokeStyle=m.col; ctx.lineWidth=1; ctx.setLineDash([2,2]);
+    ctx.beginPath(); ctx.moveTo(mx,10); ctx.lineTo(mx,44); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle=m.col; ctx.font='bold 8px IBM Plex Mono,monospace';
+    ctx.textAlign='center'; ctx.fillText(m.lbl, mx, 8);
+    ctx.fillStyle='rgba(137,220,235,.4)'; ctx.font='7px IBM Plex Mono,monospace';
+    ctx.fillText(`${m.x.toFixed(0)}`, mx, 55);
+  });
+
+  // Parent width label
+  ctx.fillStyle='rgba(107,120,150,.6)'; ctx.font='7px IBM Plex Mono,monospace'; ctx.textAlign='left';
+  ctx.fillText('0', 2, 55);
+  ctx.textAlign='right';
+  ctx.fillText(`${parentWidth}mm`, W-2, 55);
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// END SURFACE MODEL
+// ═══════════════════════════════════════════════════════════════════════
+
 // ═══════════════════════════════════════════
 // COIL LENGTH CALCULATION
 // coilLength (m) = weight / (width × thk × 7.85 / 1000)
@@ -826,18 +1146,6 @@ window.addEventListener('DOMContentLoaded', () => {
   const sel = document.getElementById('checkin-machine');
   MACHINE_LIST.forEach(m => sel.innerHTML += `<option value="${m}">${m}</option>`);
 });
-
-// ═══════════════════════════════════════════
-// TAB NAVIGATION
-// ═══════════════════════════════════════════
-function switchTab(id) {
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.main-tab').forEach(el => el.classList.remove('active'));
-  document.getElementById('tab-' + id).classList.add('active');
-  const idx = { search: 0, simulate: 1, inventory: 2 }[id];
-  document.querySelectorAll('.main-tab')[idx].classList.add('active');
-  if (id === 'inventory' && inventoryData.length === 0) loadInventory();
-}
 
 // ═══════════════════════════════════════════
 // TAB NAVIGATION
@@ -926,8 +1234,9 @@ function loadProfileForSlit() {
 function gotoSimulate() {
   if (!currentSlit) return;
   simSlit = currentSlit;
+  surfaceModel = null; parentSurfaceData = null;
+  resetSurfaceModelUI();
   updateSimSlitStrip();
-  // sync profiles
   updateProfileDropdown();
   switchTab('simulate');
 }
@@ -973,12 +1282,15 @@ function setPipeType(type) {
 
 function setThkSource(src) {
   simThkSource = src;
-  ['profile','nominal','both'].forEach(s => {
-    document.getElementById('src-' + s).classList.toggle('active', s === src);
+  ['surface','profile','nominal','both'].forEach(s => {
+    const el = document.getElementById('src-'+s);
+    if (!el) return;
+    el.classList.toggle('active', s === src);
+    // surface ใช้สีต่างออกไป
+    if (s === 'surface') el.classList.toggle('surface-active', s === src);
   });
-  document.getElementById('profile-select-row').style.display =
-    (src === 'profile' || src === 'both') ? 'block' : 'none';
-  document.getElementById('th-nom-col').style.display = src === 'nominal' ? '' : '';
+  const showProfileDrop = (src === 'profile' || src === 'both');
+  document.getElementById('profile-select-row').style.display = showProfileDrop ? 'block' : 'none';
 }
 
 function loadSlitForSim() {
@@ -989,10 +1301,24 @@ function loadSlitForSim() {
     simSlit = res.result;
     currentSlit = res.result;
     allProfiles = [];
+    surfaceModel = null; parentSurfaceData = null;
+    resetSurfaceModelUI();
     updateSimSlitStrip();
     loadProfilesForSlit(id);
     toast('✅ โหลดม้วน: ' + id, 'ok');
   });
+}
+
+function resetSurfaceModelUI() {
+  const card = document.getElementById('surface-model-card');
+  card.classList.remove('sm-ready');
+  document.getElementById('surface-model-badge').className='slit-tag no-profile';
+  document.getElementById('surface-model-badge').textContent='ยังไม่โหลด';
+  document.getElementById('surface-model-info').style.display='none';
+  document.getElementById('btn-load-surface').innerHTML='🌐 โหลด Surface Model จาก Parent Coil';
+  // reset canvas
+  const canvas=document.getElementById('parent-strip-canvas');
+  const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height);
 }
 
 function updateSimSlitStrip() {
@@ -1057,31 +1383,58 @@ function runSimulate() {
 
   if (totalPipes === 0) { toast('ความยาวม้วนน้อยกว่าความยาวท่อ', 'err'); return; }
 
-  const profileRows = (loadedProfile && (simThkSource === 'profile' || simThkSource === 'both'))
+  const profileRows  = (loadedProfile && (simThkSource === 'profile' || simThkSource === 'both'))
     ? (loadedProfile.rows || []) : [];
-  const hasProfile  = profileRows.length > 0;
+  const hasProfile   = profileRows.length > 0;
+  const hasSurface   = !!surfaceModel && simThkSource === 'surface';
 
-  document.getElementById('dual-no-profile-note').textContent =
-    hasProfile ? '' : '⚠ ไม่มี Profile — ใช้ Nominal ทั้งหมด';
+  // ── แสดง note แจ้งแหล่งข้อมูล ────────────────────────────────────────
+  const srcLabel = hasSurface ? '' : (hasProfile ? '' : '⚠ ไม่มี Profile/Surface — ใช้ Nominal');
+  document.getElementById('dual-no-profile-note').textContent = srcLabel;
+
+  // ── Surface quality row ───────────────────────────────────────────────
+  const sqRow = document.getElementById('surface-quality-row');
+  if (hasSurface) {
+    sqRow.style.display = 'block';
+    document.getElementById('sq-title').textContent =
+      `🌐 ${surfaceModel.modelName} | x = ${surfaceModel.xCenter.toFixed(1)} mm จากขอบซ้ายแผ่น`;
+    document.getElementById('sq-detail').textContent =
+      `Parent ${surfaceModel.parentWidth} mm → Slit No.${simSlit.slitNo} center ${surfaceModel.xCenter.toFixed(1)} mm | ${surfaceModel.posArr.length} จุดตามยาว`;
+    const r2el = document.getElementById('sq-r2-badge');
+    r2el.textContent = `R²=${surfaceModel.r2.toFixed(4)}`;
+    r2el.className   = `tag ${surfaceModel.r2>0.99?'pass':surfaceModel.r2>0.95?'warn':'fail'}`;
+  } else {
+    sqRow.style.display = 'none';
+  }
 
   const nomStripWtPerM = simSlit.width * nom_thk * RHO / 1000;
   const nomPipeWt      = nomStripWtPerM * pipeLenM;
 
-  // ─── คำนวณทีละเส้น — sample 20 จุด interpolate ───────────────────────────
+  // ─── คำนวณทีละเส้น ───────────────────────────────────────────────────
   const pipesData = [];
   for (let i = 0; i < totalPipes; i++) {
     const startM = i * pipeLenM;
     const endM   = (i + 1) * pipeLenM;
-    const sampled = hasProfile
-      ? sampleThkInRange(profileRows, startM, endM, nom_thk, 20)
-      : { avg: nom_thk, L: nom_thk, C: nom_thk, R: nom_thk };
-    const profilePipeWt = simSlit.width * sampled.avg * RHO / 1000 * pipeLenM;
+    let thkAvg, thkL, thkC, thkR;
+
+    if (hasSurface) {
+      // 🌐 Surface Model: sample xCenter ตามยาวในช่วงนี้ (20 จุด)
+      thkAvg = sampleSurface(surfaceModel, startM, endM, 20);
+      thkL = thkC = thkR = thkAvg;
+    } else if (hasProfile && simThkSource !== 'nominal') {
+      // 📊 Profile Log: interpolate L/C/R ทุกจุด
+      const s  = sampleThkInRange(profileRows, startM, endM, nom_thk, 20);
+      thkAvg=s.avg; thkL=s.L; thkC=s.C; thkR=s.R;
+    } else {
+      // 📋 Nominal: ใช้ค่าคงที่
+      thkAvg=nom_thk; thkL=nom_thk; thkC=nom_thk; thkR=nom_thk;
+    }
+
+    const profilePipeWt = simSlit.width * thkAvg * RHO / 1000 * pipeLenM;
     const delta = ((profilePipeWt - nomPipeWt) / nomPipeWt * 100);
     pipesData.push({
-      pipeNo: i + 1,
-      startM: startM.toFixed(1), endM: endM.toFixed(1), midM: (startM + endM) / 2,
-      thkAvg: sampled.avg, thkL: sampled.L, thkC: sampled.C, thkR: sampled.R,
-      profileWt: profilePipeWt, nomWt: nomPipeWt, delta
+      pipeNo:i+1, startM:startM.toFixed(1), endM:endM.toFixed(1), midM:(startM+endM)/2,
+      thkAvg, thkL, thkC, thkR, profileWt:profilePipeWt, nomWt:nomPipeWt, delta
     });
   }
 
@@ -1091,7 +1444,7 @@ function runSimulate() {
   const minW      = Math.min(...weights), maxW = Math.max(...weights);
   const warnCount = pipesData.filter(p => Math.abs(p.delta) > tolPct).length;
 
-  _chartData = { pipes: pipesData, profileRows, coilLenM, pipeLenM, nom_thk, tolPct, source: simThkSource, width: simSlit.width };
+  _chartData = { pipes:pipesData, profileRows, coilLenM, pipeLenM, nom_thk, tolPct, source:simThkSource, width:simSlit.width, surfaceModel };
 
   // Strip Width Check
   const ok = simSlit.width >= stripNeeded;
@@ -1113,7 +1466,7 @@ function runSimulate() {
   document.getElementById('nom-legend-label').style.display = simThkSource === 'profile' ? 'none' : '';
 
   // Draw both charts
-  drawThkProfileCanvas(pipesData, profileRows, coilLenM, nom_thk);
+  drawThkProfileCanvas(pipesData, profileRows, coilLenM, nom_thk, surfaceModel, hasSurface);
   drawWeightChart(pipesData, avgW, tolPct, simThkSource);
   setupChartHover();
 
@@ -1121,14 +1474,17 @@ function runSimulate() {
   renderSimTable(pipesData, tolPct, simThkSource);
 
   document.getElementById('sim-results').style.display = 'block';
-  document.getElementById('sim-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  toast(`✅ Simulate: ${totalPipes} เส้น${hasProfile ? ' (ใช้ Profile จริง)' : ' (Nominal)'}`, 'ok');
+  document.getElementById('sim-results').scrollIntoView({ behavior:'smooth', block:'start' });
+
+  const srcTxt = hasSurface ? `🌐 Surface (${surfaceModel.modelName} R²=${surfaceModel.r2.toFixed(3)})`
+                : hasProfile ? '📊 Profile' : '📋 Nominal';
+  toast(`✅ Simulate: ${totalPipes} เส้น — ${srcTxt}`, 'ok');
 }
 
 // ═══════════════════════════════════════════
 // CHART A: Thickness Profile Canvas
 // ═══════════════════════════════════════════
-function drawThkProfileCanvas(pipes, profileRows, coilLenM, nomThk) {
+function drawThkProfileCanvas(pipes, profileRows, coilLenM, nomThk, sm=null, isSurface=false) {
   const canvas = document.getElementById('thk-profile-canvas');
   const W = canvas.parentElement.clientWidth - 24;
   const H = 155;
@@ -1138,11 +1494,12 @@ function drawThkProfileCanvas(pipes, profileRows, coilLenM, nomThk) {
 
   const PAD_L=44, PAD_R=10, PAD_T=10, PAD_B=22;
   const cW=W-PAD_L-PAD_R, cH=H-PAD_T-PAD_B;
-  const hasProfile = profileRows && profileRows.length > 0;
+  const hasProfile = !isSurface && profileRows && profileRows.length > 0;
 
   let allV = [nomThk];
   if (hasProfile) profileRows.forEach(r => (r.vals||[]).forEach(v => { if(v!==''&&!isNaN(v)) allV.push(Number(v)); }));
-  else            pipes.forEach(p => allV.push(p.thkAvg));
+  else if (isSurface && sm) allV = sm.thkCenter.concat([nomThk]);
+  else pipes.forEach(p => allV.push(p.thkAvg));
   const yMin=Math.min(...allV)-0.05, yMax=Math.max(...allV)+0.05, yRng=yMax-yMin||0.1;
 
   function xOf(posM) { return PAD_L + (posM/coilLenM)*cW; }
@@ -1162,7 +1519,7 @@ function drawThkProfileCanvas(pipes, profileRows, coilLenM, nomThk) {
   ctx.beginPath(); ctx.moveTo(PAD_L,yOf(nomThk)); ctx.lineTo(PAD_L+cW,yOf(nomThk)); ctx.stroke();
   ctx.setLineDash([]);
 
-  // Pipe boundaries (faint)
+  // Pipe boundaries (faint, skip if too many)
   if (pipes.length <= 80) {
     ctx.strokeStyle='rgba(37,48,72,.9)'; ctx.lineWidth=0.5;
     pipes.forEach(p => {
@@ -1171,24 +1528,47 @@ function drawThkProfileCanvas(pipes, profileRows, coilLenM, nomThk) {
     });
   }
 
-  if (hasProfile) {
-    // L, C, R lines
+  if (isSurface && sm) {
+    // ── Surface model mode: วาด predicted curve จาก model ──────────────
+    // เส้นต่อเนื่อง sample ทุก 1m
+    const step = Math.max(0.5, coilLenM/200);
+    ctx.beginPath(); ctx.strokeStyle='#89dceb'; ctx.lineWidth=2;
+    let first=true;
+    for (let pos=0; pos<=coilLenM; pos+=step) {
+      const y = yOf(sm.thkAt(pos));
+      first ? ctx.moveTo(xOf(pos),y) : ctx.lineTo(xOf(pos),y);
+      first=false;
+    }
+    ctx.stroke();
+    // จุดวัดจริง 5 จุด (measurement points)
+    sm.posArr.forEach((pos,i) => {
+      ctx.beginPath(); ctx.arc(xOf(pos),yOf(sm.thkCenter[i]),4,0,Math.PI*2);
+      ctx.fillStyle='#cba6f7'; ctx.fill();
+      ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.stroke();
+    });
+    // label model name
+    ctx.fillStyle='rgba(137,220,235,.5)'; ctx.font='8px IBM Plex Mono,monospace'; ctx.textAlign='left';
+    ctx.fillText(`🌐 ${sm.modelName}  R²=${sm.r2.toFixed(4)}`, PAD_L+4, PAD_T+10);
+
+  } else if (hasProfile) {
+    // ── Profile Log mode ─────────────────────────────────────────────────
     const cols=['#89dceb','#a6e3a1','#f9e2af'];
     for (let vi=0; vi<3; vi++) {
       const pts = profileRows.map(r => ({ pos:r.pos, val:(r.vals||[])[vi] }))
                              .filter(p => p.val!==''&&!isNaN(p.val)&&p.val!==undefined);
       if (pts.length < 2) continue;
       ctx.beginPath(); ctx.strokeStyle=cols[vi]; ctx.lineWidth=1.2; ctx.globalAlpha=0.7;
-      pts.forEach((p,i) => i===0 ? ctx.moveTo(xOf(p.pos),yOf(Number(p.val))) : ctx.lineTo(xOf(p.pos),yOf(Number(p.val))));
+      pts.forEach((p,i) => i===0?ctx.moveTo(xOf(p.pos),yOf(Number(p.val))):ctx.lineTo(xOf(p.pos),yOf(Number(p.val))));
       ctx.stroke(); ctx.globalAlpha=1;
       pts.forEach(p => { ctx.beginPath(); ctx.arc(xOf(p.pos),yOf(Number(p.val)),2.5,0,Math.PI*2); ctx.fillStyle=cols[vi]; ctx.fill(); });
     }
-    // Average per-pipe (purple)
+    // avg per-pipe
     ctx.beginPath(); ctx.strokeStyle='#cba6f7'; ctx.lineWidth=2;
     pipes.forEach((p,i) => { const x=xOf(p.midM); i===0?ctx.moveTo(x,yOf(p.thkAvg)):ctx.lineTo(x,yOf(p.thkAvg)); });
     ctx.stroke();
+
   } else {
-    // No profile: step line
+    // ── Nominal only ──────────────────────────────────────────────────────
     ctx.beginPath(); ctx.strokeStyle='rgba(203,166,247,.6)'; ctx.lineWidth=1.5;
     pipes.forEach((p,i) => {
       const x1=xOf(parseFloat(p.startM)), x2=xOf(parseFloat(p.endM)), y=yOf(p.thkAvg);
@@ -1196,7 +1576,7 @@ function drawThkProfileCanvas(pipes, profileRows, coilLenM, nomThk) {
     });
     ctx.stroke();
     ctx.fillStyle='rgba(203,166,247,.5)'; ctx.font='9px IBM Plex Mono,monospace'; ctx.textAlign='center';
-    ctx.fillText('ไม่มี Profile — ใช้ค่า Nominal', PAD_L+cW/2, PAD_T+cH/2);
+    ctx.fillText('ไม่มี Profile/Surface — ใช้ค่า Nominal', PAD_L+cW/2, PAD_T+cH/2);
   }
 
   // X labels
@@ -1341,16 +1721,18 @@ function handleChartMove(e, canvas, isTouch) {
 function hideTooltip() {
   document.getElementById('sim-tooltip').style.display='none';
   if (_chartData) {
-    const {pipes,profileRows,coilLenM,nom_thk,tolPct,source}=_chartData;
+    const {pipes,profileRows,coilLenM,nom_thk,tolPct,source,surfaceModel:sm}=_chartData;
     const avgW=pipes.reduce((a,b)=>a+b.profileWt,0)/pipes.length;
     drawWeightChart(pipes,avgW,tolPct,source,-1);
-    drawThkProfileCanvas(pipes,profileRows,coilLenM,nom_thk);
+    drawThkProfileCanvas(pipes,profileRows,coilLenM,nom_thk,sm,source==='surface'&&!!sm);
   }
 }
 
 function drawThkCursor(idx, pipes, coilLenM, nomThk, profileRows) {
-  // Redraw thk canvas then overlay highlight
-  drawThkProfileCanvas(pipes, profileRows, coilLenM, nomThk);
+  // Redraw thk canvas then overlay highlight zone
+  const sm  = _chartData?.surfaceModel||null;
+  const isSurface = (_chartData?.source==='surface') && !!sm;
+  drawThkProfileCanvas(pipes, profileRows, coilLenM, nomThk, sm, isSurface);
   const canvas = document.getElementById('thk-profile-canvas');
   const ctx    = canvas.getContext('2d');
   const PAD_L=44, PAD_R=10, PAD_T=10, PAD_B=22;
@@ -1358,13 +1740,11 @@ function drawThkCursor(idx, pipes, coilLenM, nomThk, profileRows) {
   const p=pipes[idx]; if(!p) return;
   const xS=PAD_L+(parseFloat(p.startM)/coilLenM)*cW;
   const xE=PAD_L+(parseFloat(p.endM)/coilLenM)*cW;
-  // Highlight band
   ctx.fillStyle='rgba(137,220,235,.1)';
   ctx.fillRect(xS,PAD_T,xE-xS,cH);
   ctx.strokeStyle='rgba(137,220,235,.6)'; ctx.lineWidth=1.5;
   ctx.beginPath(); ctx.moveTo(xS,PAD_T); ctx.lineTo(xS,PAD_T+cH);
   ctx.moveTo(xE,PAD_T); ctx.lineTo(xE,PAD_T+cH); ctx.stroke();
-  // Pipe number label
   ctx.fillStyle='rgba(137,220,235,.9)'; ctx.font='bold 9px IBM Plex Mono,monospace'; ctx.textAlign='center';
   ctx.fillText('#'+p.pipeNo, (xS+xE)/2, PAD_T+cH+15);
 }
