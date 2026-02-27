@@ -133,6 +133,29 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14
 .chart-title{font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px}
 canvas{display:block;width:100%!important;max-height:220px}
 
+/* ── DUAL LINKED CANVAS ── */
+.dual-chart-wrap{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px}
+.dual-chart-header{padding:10px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.dual-chart-section{padding:10px 12px;border-bottom:1px solid rgba(37,48,72,.5);position:relative;cursor:crosshair}
+.dual-chart-section:last-child{border-bottom:none}
+.dual-section-label{font-size:9px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.canvas-interactive{display:block;width:100%!important;touch-action:none}
+
+/* ── HOVER TOOLTIP ── */
+#sim-tooltip{
+  position:fixed;pointer-events:none;z-index:999;
+  background:rgba(17,22,32,.97);border:1px solid var(--border);
+  border-radius:8px;padding:8px 12px;font-family:var(--mono);font-size:11px;
+  min-width:180px;display:none;
+  box-shadow:0 8px 24px rgba(0,0,0,.5);
+}
+.tt-row{display:flex;justify-content:space-between;gap:16px;margin-bottom:3px;line-height:1.5}
+.tt-label{color:var(--muted);font-size:10px}
+.tt-val{font-weight:600}
+.tt-divider{height:1px;background:var(--border);margin:5px 0}
+.tt-pipe-badge{background:rgba(137,220,235,.1);border:1px solid rgba(137,220,235,.25);
+  border-radius:4px;padding:2px 8px;color:var(--accent);font-size:10px;margin-top:4px;text-align:center}
+
 /* ── TABLE ── */
 .data-table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px}
 .data-table th{padding:8px 10px;text-align:left;font-size:9px;color:var(--muted);text-transform:uppercase;
@@ -477,15 +500,48 @@ canvas{display:block;width:100%!important;max-height:220px}
       </div>
     </div>
 
-    <!-- Weight Chart -->
-    <div class="chart-wrap">
-      <div class="chart-title">📈 น้ำหนักคาดการณ์รายเส้น (kg)</div>
-      <canvas id="weight-chart" height="180"></canvas>
-      <div style="display:flex;gap:12px;margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--muted)">
-        <span>─ <span style="color:var(--accent)">Profile</span></span>
-        <span>─ <span style="color:var(--green)">Nominal</span></span>
-        <span>--- <span style="color:var(--red)">เกณฑ์ ±</span><span id="chart-legend-tol">10</span>%</span>
+    <!-- ═══ DUAL LINKED CHART ═══ -->
+    <div class="dual-chart-wrap" id="dual-chart-container">
+      <div class="dual-chart-header">
+        <span style="font-size:10px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.07em">
+          📊 Profile ความหนา + น้ำหนักคาดการณ์ — เลื่อนนิ้วเพื่อดูรายละเอียด
+        </span>
+        <span id="dual-no-profile-note" style="font-size:10px;color:var(--orange);font-family:var(--mono)"></span>
       </div>
+
+      <!-- Chart A: Thickness Profile -->
+      <div class="dual-chart-section" id="thk-chart-section">
+        <div class="dual-section-label">
+          ความหนา (mm) — L <span style="color:#89dceb">●</span> C <span style="color:#a6e3a1">●</span> R <span style="color:#f9e2af">●</span> avg <span style="color:#cba6f7">—</span>
+        </div>
+        <canvas class="canvas-interactive" id="thk-profile-canvas" height="140"></canvas>
+      </div>
+
+      <!-- Chart B: Weight per Pipe -->
+      <div class="dual-chart-section" id="wt-chart-section">
+        <div class="dual-section-label" style="display:flex;justify-content:space-between">
+          <span>น้ำหนัก/เส้น (kg) — 
+            <span style="color:var(--accent)">Profile</span>
+            <span id="nom-legend-label" style="color:var(--green)"> / Nominal</span>
+          </span>
+          <span style="color:var(--muted)">tol ±<span id="chart-legend-tol">10</span>%</span>
+        </div>
+        <canvas class="canvas-interactive" id="weight-chart" height="160"></canvas>
+      </div>
+    </div>
+
+    <!-- Tooltip (shared) -->
+    <div id="sim-tooltip">
+      <div class="tt-row"><span class="tt-label">ตำแหน่ง</span><span class="tt-val" id="tt-pos" style="color:var(--accent)">—</span></div>
+      <div class="tt-divider"></div>
+      <div class="tt-row"><span class="tt-label">หนา L</span><span class="tt-val" id="tt-thkL" style="color:#89dceb">—</span></div>
+      <div class="tt-row"><span class="tt-label">หนา C</span><span class="tt-val" id="tt-thkC" style="color:#a6e3a1">—</span></div>
+      <div class="tt-row"><span class="tt-label">หนา R</span><span class="tt-val" id="tt-thkR" style="color:#f9e2af">—</span></div>
+      <div class="tt-row"><span class="tt-label">หนาเฉลี่ย</span><span class="tt-val" id="tt-thkAvg" style="color:#cba6f7">—</span></div>
+      <div class="tt-divider"></div>
+      <div class="tt-row"><span class="tt-label">น้ำหนัก (Profile)</span><span class="tt-val" id="tt-wt-profile" style="color:var(--accent)">—</span></div>
+      <div class="tt-row" id="tt-nom-row"><span class="tt-label">น้ำหนัก (Nominal)</span><span class="tt-val" id="tt-wt-nom" style="color:var(--green)">—</span></div>
+      <div class="tt-pipe-badge" id="tt-pipe-no">เส้นที่ —</div>
     </div>
 
     <!-- Alerts -->
@@ -714,56 +770,74 @@ function calcPipeWeightPerM() {
 // ═══════════════════════════════════════════
 function calcCoilLength(weight, widthMM, thkMM) {
   if (!weight || !widthMM || !thkMM) return 0;
-  const weightPerM = widthMM * thkMM * RHO / 1000; // kg/m
-  return weight / weightPerM;
+  return weight / (widthMM * thkMM * RHO / 1000);
 }
 
 // ═══════════════════════════════════════════
-// INTERPOLATE THICKNESS ณ ตำแหน่ง posM
+// IMPROVED INTERPOLATION — Linear interpolate L/C/R แยก
 // ═══════════════════════════════════════════
-function interpolateThk(rows, posM) {
+function interpolateThkAt(rows, posM) {
   if (!rows || rows.length === 0) return null;
-  const getAvg = r => {
-    const vals = (r.vals || []).filter(v => v !== '' && !isNaN(v)).map(Number);
-    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-  };
-  const before = [...rows].filter(r => r.pos <= posM).sort((a, b) => b.pos - a.pos)[0];
-  const after  = [...rows].filter(r => r.pos >  posM).sort((a, b) => a.pos - b.pos)[0];
-  if (!before && !after) return null;
-  if (!before) return getAvg(after);
-  if (!after)  return getAvg(before);
-  const t0 = getAvg(before), t1 = getAvg(after);
-  if (t0 === null || t1 === null) return t0 ?? t1;
-  const frac = (posM - before.pos) / ((after.pos - before.pos) || 1);
-  return t0 + frac * (t1 - t0);
+  const sorted = [...rows].filter(r => r.pos != null).sort((a, b) => a.pos - b.pos);
+  if (sorted.length === 0) return null;
+  if (posM <= sorted[0].pos)                     return getRowVals(sorted[0]);
+  if (posM >= sorted[sorted.length - 1].pos)     return getRowVals(sorted[sorted.length - 1]);
+  let lo = sorted[0], hi = sorted[sorted.length - 1];
+  for (let i = 0; i < sorted.length - 1; i++) {
+    if (sorted[i].pos <= posM && sorted[i+1].pos >= posM) { lo = sorted[i]; hi = sorted[i+1]; break; }
+  }
+  const frac = (posM - lo.pos) / ((hi.pos - lo.pos) || 1);
+  const lv = getRowVals(lo), hv = getRowVals(hi);
+  return { L: lerp(lv.L, hv.L, frac), C: lerp(lv.C, hv.C, frac), R: lerp(lv.R, hv.R, frac),
+           avg: lerp(lv.avg, hv.avg, frac) };
 }
 
-// ═══════════════════════════════════════════
-// THICKNESS FOR PIPE RANGE [startM, endM]
-// ═══════════════════════════════════════════
-function getThkForRange(profileRows, startM, endM, fallbackThk) {
-  if (!profileRows || profileRows.length === 0) return fallbackThk;
-  const points = profileRows.filter(r => r.pos >= startM && r.pos < endM);
-  if (points.length > 0) {
-    const avgs = points.map(r => {
-      const vals = (r.vals || []).filter(v => v !== '' && !isNaN(v)).map(Number);
-      return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-    }).filter(v => v !== null);
-    if (avgs.length > 0) return avgs.reduce((a, b) => a + b, 0) / avgs.length;
-  }
-  // Interpolate midpoint
-  const midM = (startM + endM) / 2;
-  return interpolateThk(profileRows, midM) ?? fallbackThk;
+function getRowVals(r) {
+  const v = (r.vals || []).map(x => (x === '' || isNaN(x)) ? null : Number(x));
+  const L = v[0] ?? null, C = v[1] ?? null, R = v[2] ?? null;
+  const valid = [L, C, R].filter(x => x !== null);
+  const avg = valid.length ? valid.reduce((a,b) => a+b, 0) / valid.length : null;
+  return { L: L ?? avg, C: C ?? avg, R: R ?? avg, avg };
 }
+function lerp(a, b, t) { if (a==null||b==null) return a??b; return a + (b-a)*t; }
+
+// Sample N จุดในช่วง [startM, endM] → ได้ค่าเฉลี่ยที่แม่นกว่าการ average เฉพาะจุดวัด
+function sampleThkInRange(profileRows, startM, endM, fallback, N = 20) {
+  if (!profileRows || profileRows.length === 0)
+    return { avg: fallback, L: fallback, C: fallback, R: fallback };
+  const step = (endM - startM) / N;
+  let sL=0, sC=0, sR=0, sAvg=0;
+  for (let i = 0; i <= N; i++) {
+    const v = interpolateThkAt(profileRows, startM + step*i);
+    sL += v?.L ?? fallback; sC += v?.C ?? fallback;
+    sR += v?.R ?? fallback; sAvg += v?.avg ?? fallback;
+  }
+  const cnt = N + 1;
+  return { avg: sAvg/cnt, L: sL/cnt, C: sC/cnt, R: sR/cnt };
+}
+
+// ─── State สำหรับ chart hover ────────────────────────────────────────────────
+let _chartData = null;
 
 // ═══════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', () => {
-  // Populate machine dropdown
   const sel = document.getElementById('checkin-machine');
   MACHINE_LIST.forEach(m => sel.innerHTML += `<option value="${m}">${m}</option>`);
 });
+
+// ═══════════════════════════════════════════
+// TAB NAVIGATION
+// ═══════════════════════════════════════════
+function switchTab(id) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.main-tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  const idx = { search: 0, simulate: 1, inventory: 2 }[id];
+  document.querySelectorAll('.main-tab')[idx].classList.add('active');
+  if (id === 'inventory' && inventoryData.length === 0) loadInventory();
+}
 
 // ═══════════════════════════════════════════
 // TAB NAVIGATION
@@ -977,71 +1051,57 @@ function runSimulate() {
   const pipeLenMM = parseFloat(document.getElementById('pipe-len').value) || 6000;
   const pipeLenM  = pipeLenMM / 1000;
   const tolPct    = parseFloat(document.getElementById('weight-tol').value) || 10;
-
-  const nom_thk  = simSlit.thkC || simSlit.thkL || simSlit.thkR || 0;
-  const coilLenM = calcCoilLength(simSlit.weight, simSlit.width, nom_thk);
+  const nom_thk   = simSlit.thkC || simSlit.thkL || simSlit.thkR || 0;
+  const coilLenM  = calcCoilLength(simSlit.weight, simSlit.width, nom_thk);
   const totalPipes = Math.floor(coilLenM / pipeLenM);
 
   if (totalPipes === 0) { toast('ความยาวม้วนน้อยกว่าความยาวท่อ', 'err'); return; }
 
-  // Profile rows
   const profileRows = (loadedProfile && (simThkSource === 'profile' || simThkSource === 'both'))
     ? (loadedProfile.rows || []) : [];
+  const hasProfile  = profileRows.length > 0;
 
-  // คำนวณน้ำหนักต่อเมตรจากขนาดท่อจริง (kg/m ของเนื้อท่อ)
-  const pipeWtPerM = calcPipeWeightPerM();
+  document.getElementById('dual-no-profile-note').textContent =
+    hasProfile ? '' : '⚠ ไม่มี Profile — ใช้ Nominal ทั้งหมด';
 
-  // น้ำหนัก nominal (ใช้ความหนา nom_thk ทุกเส้น)
-  // สูตร: strip weight per meter = Width × thk × 7.85 / 1000
   const nomStripWtPerM = simSlit.width * nom_thk * RHO / 1000;
   const nomPipeWt      = nomStripWtPerM * pipeLenM;
 
-  // คำนวณทีละเส้น
+  // ─── คำนวณทีละเส้น — sample 20 จุด interpolate ───────────────────────────
   const pipesData = [];
   for (let i = 0; i < totalPipes; i++) {
     const startM = i * pipeLenM;
     const endM   = (i + 1) * pipeLenM;
-
-    // ความหนาเฉลี่ยจาก profile
-    const profileThk = profileRows.length > 0
-      ? getThkForRange(profileRows, startM, endM, nom_thk)
-      : nom_thk;
-
-    // น้ำหนักจาก profile thickness (strip weight approach)
-    const profileStripWtPerM = simSlit.width * profileThk * RHO / 1000;
-    const profilePipeWt      = profileStripWtPerM * pipeLenM;
-
+    const sampled = hasProfile
+      ? sampleThkInRange(profileRows, startM, endM, nom_thk, 20)
+      : { avg: nom_thk, L: nom_thk, C: nom_thk, R: nom_thk };
+    const profilePipeWt = simSlit.width * sampled.avg * RHO / 1000 * pipeLenM;
+    const delta = ((profilePipeWt - nomPipeWt) / nomPipeWt * 100);
     pipesData.push({
-      pipeNo:    i + 1,
-      startM:    startM.toFixed(1),
-      endM:      endM.toFixed(1),
-      profileThk,
-      profileWt: profilePipeWt,
-      nomWt:     nomPipeWt,
-      delta:     ((profilePipeWt - nomPipeWt) / nomPipeWt * 100)
+      pipeNo: i + 1,
+      startM: startM.toFixed(1), endM: endM.toFixed(1), midM: (startM + endM) / 2,
+      thkAvg: sampled.avg, thkL: sampled.L, thkC: sampled.C, thkR: sampled.R,
+      profileWt: profilePipeWt, nomWt: nomPipeWt, delta
     });
   }
 
   // Stats
-  const weights = pipesData.map(p =>
-    simThkSource === 'nominal' ? p.nomWt : p.profileWt
-  );
-  const avgW   = weights.reduce((a, b) => a + b, 0) / weights.length;
-  const minW   = Math.min(...weights);
-  const maxW   = Math.max(...weights);
+  const weights   = pipesData.map(p => simThkSource === 'nominal' ? p.nomWt : p.profileWt);
+  const avgW      = weights.reduce((a,b) => a+b, 0) / weights.length;
+  const minW      = Math.min(...weights), maxW = Math.max(...weights);
   const warnCount = pipesData.filter(p => Math.abs(p.delta) > tolPct).length;
 
-  // Update Strip Width Check
-  const checkBox = document.getElementById('stripw-check-box');
+  _chartData = { pipes: pipesData, profileRows, coilLenM, pipeLenM, nom_thk, tolPct, source: simThkSource, width: simSlit.width };
+
+  // Strip Width Check
   const ok = simSlit.width >= stripNeeded;
-  checkBox.className = 'stripw-check ' + (ok ? 'ok' : 'warn');
-  document.getElementById('sw-needed-text').textContent =
-    `Strip Width ต้องการ: ${stripNeeded.toFixed(1)} mm`;
+  document.getElementById('stripw-check-box').className = 'stripw-check ' + (ok ? 'ok' : 'warn');
+  document.getElementById('sw-needed-text').textContent = `Strip Width ต้องการ: ${stripNeeded.toFixed(1)} mm`;
   document.getElementById('sw-detail-text').textContent = ok
     ? `✅ ม้วนนี้กว้าง ${simSlit.width} mm — พอเพียง (เหลือ ${(simSlit.width - stripNeeded).toFixed(1)} mm)`
     : `⚠️ ม้วนนี้กว้าง ${simSlit.width} mm — ไม่พอ (ขาด ${(stripNeeded - simSlit.width).toFixed(1)} mm)`;
 
-  // Update KPIs
+  // KPIs
   document.getElementById('kpi-total-pipes').innerHTML = `${totalPipes}<span class="kpi-unit">เส้น</span>`;
   document.getElementById('kpi-coil-len').textContent   = `ความยาวม้วน: ${coilLenM.toFixed(0)} m`;
   document.getElementById('kpi-avg-weight').innerHTML   = `${avgW.toFixed(3)}<span class="kpi-unit">kg</span>`;
@@ -1050,151 +1110,299 @@ function runSimulate() {
   document.getElementById('kpi-max-w').innerHTML  = `${maxW.toFixed(3)}<span class="kpi-unit">kg</span>`;
   document.getElementById('kpi-warn-count').innerHTML = `${warnCount}<span class="kpi-unit">เส้น</span>`;
   document.getElementById('chart-legend-tol').textContent = tolPct;
+  document.getElementById('nom-legend-label').style.display = simThkSource === 'profile' ? 'none' : '';
 
-  // Chart
+  // Draw both charts
+  drawThkProfileCanvas(pipesData, profileRows, coilLenM, nom_thk);
   drawWeightChart(pipesData, avgW, tolPct, simThkSource);
+  setupChartHover();
 
-  // Alerts
   renderWeightAlerts(pipesData, tolPct);
-
-  // Table
   renderSimTable(pipesData, tolPct, simThkSource);
 
   document.getElementById('sim-results').style.display = 'block';
   document.getElementById('sim-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  toast(`✅ Simulate สำเร็จ: ${totalPipes} เส้น`, 'ok');
+  toast(`✅ Simulate: ${totalPipes} เส้น${hasProfile ? ' (ใช้ Profile จริง)' : ' (Nominal)'}`, 'ok');
 }
 
 // ═══════════════════════════════════════════
-// DRAW WEIGHT CHART
+// CHART A: Thickness Profile Canvas
 // ═══════════════════════════════════════════
-function drawWeightChart(pipes, avgW, tolPct, source) {
-  const canvas = document.getElementById('weight-chart');
-  const parent = canvas.parentElement;
-  const W = parent.clientWidth - 24;
-  const H = 200;
-  canvas.width  = W;
-  canvas.height = H;
+function drawThkProfileCanvas(pipes, profileRows, coilLenM, nomThk) {
+  const canvas = document.getElementById('thk-profile-canvas');
+  const W = canvas.parentElement.clientWidth - 24;
+  const H = 155;
+  canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, W, H);
 
-  const PAD_L = 48, PAD_R = 10, PAD_T = 14, PAD_B = 28;
-  const chartW = W - PAD_L - PAD_R;
-  const chartH = H - PAD_T - PAD_B;
-  const n = pipes.length;
-  if (n === 0) return;
+  const PAD_L=44, PAD_R=10, PAD_T=10, PAD_B=22;
+  const cW=W-PAD_L-PAD_R, cH=H-PAD_T-PAD_B;
+  const hasProfile = profileRows && profileRows.length > 0;
 
-  const allVals = pipes.flatMap(p => [p.profileWt, p.nomWt]);
-  const vMin = Math.min(...allVals) * 0.98;
-  const vMax = Math.max(...allVals) * 1.02;
-  const vRange = vMax - vMin || 1;
+  let allV = [nomThk];
+  if (hasProfile) profileRows.forEach(r => (r.vals||[]).forEach(v => { if(v!==''&&!isNaN(v)) allV.push(Number(v)); }));
+  else            pipes.forEach(p => allV.push(p.thkAvg));
+  const yMin=Math.min(...allV)-0.05, yMax=Math.max(...allV)+0.05, yRng=yMax-yMin||0.1;
 
-  function xOf(i)   { return PAD_L + (i / (n - 1 || 1)) * chartW; }
-  function yOf(val) { return PAD_T + chartH - ((val - vMin) / vRange) * chartH; }
+  function xOf(posM) { return PAD_L + (posM/coilLenM)*cW; }
+  function yOf(val)  { return PAD_T + cH - ((val-yMin)/yRng)*cH; }
 
-  // Grid lines
-  ctx.strokeStyle = '#253048'; ctx.lineWidth = 0.5;
-  for (let i = 0; i <= 4; i++) {
-    const y = PAD_T + (chartH / 4) * i;
-    ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(PAD_L + chartW, y); ctx.stroke();
-    ctx.fillStyle = '#3d4f6c'; ctx.font = '8px IBM Plex Mono,monospace'; ctx.textAlign = 'right';
-    ctx.fillText((vMax - vRange / 4 * i).toFixed(3), PAD_L - 3, y + 3);
+  // Grid
+  ctx.strokeStyle='#253048'; ctx.lineWidth=0.5;
+  for (let i=0; i<=3; i++) {
+    const y = PAD_T+(cH/3)*i;
+    ctx.beginPath(); ctx.moveTo(PAD_L,y); ctx.lineTo(PAD_L+cW,y); ctx.stroke();
+    ctx.fillStyle='#3d4f6c'; ctx.font='8px IBM Plex Mono,monospace'; ctx.textAlign='right';
+    ctx.fillText((yMax-(yRng/3)*i).toFixed(3), PAD_L-3, y+3);
   }
 
-  // Tolerance band
-  const yUpper = yOf(avgW * (1 + tolPct / 100));
-  const yLower = yOf(avgW * (1 - tolPct / 100));
-  ctx.fillStyle = 'rgba(243,139,168,.06)';
-  ctx.fillRect(PAD_L, Math.min(yUpper, yLower), chartW, Math.abs(yLower - yUpper));
-  ctx.strokeStyle = 'rgba(243,139,168,.35)'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
-  [yUpper, yLower].forEach(y => {
-    ctx.beginPath(); ctx.moveTo(PAD_L, y); ctx.lineTo(PAD_L + chartW, y); ctx.stroke();
-  });
+  // Nominal line
+  ctx.strokeStyle='rgba(107,114,128,.5)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(PAD_L,yOf(nomThk)); ctx.lineTo(PAD_L+cW,yOf(nomThk)); ctx.stroke();
   ctx.setLineDash([]);
 
-  // Average line
-  ctx.strokeStyle = 'rgba(137,220,235,.4)'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
-  ctx.beginPath(); ctx.moveTo(PAD_L, yOf(avgW)); ctx.lineTo(PAD_L + chartW, yOf(avgW)); ctx.stroke();
-  ctx.setLineDash([]);
-
-  // Nominal line (green)
-  if (source !== 'profile' && pipes.length > 1) {
-    ctx.beginPath(); ctx.strokeStyle = 'rgba(166,227,161,.6)'; ctx.lineWidth = 1.5;
-    pipes.forEach((p, i) => i === 0 ? ctx.moveTo(xOf(i), yOf(p.nomWt)) : ctx.lineTo(xOf(i), yOf(p.nomWt)));
-    ctx.stroke();
-  }
-
-  // Profile line (accent)
-  if (source !== 'nominal' && n > 1) {
-    ctx.beginPath(); ctx.strokeStyle = '#89dceb'; ctx.lineWidth = 2;
-    pipes.forEach((p, i) => i === 0 ? ctx.moveTo(xOf(i), yOf(p.profileWt)) : ctx.lineTo(xOf(i), yOf(p.profileWt)));
-    ctx.stroke();
-
-    // Dots — warn ones in red
-    pipes.forEach((p, i) => {
-      const isWarn = Math.abs(p.delta) > tolPct;
-      ctx.beginPath();
-      ctx.arc(xOf(i), yOf(p.profileWt), n > 100 ? 1.5 : 3, 0, Math.PI * 2);
-      ctx.fillStyle = isWarn ? '#f38ba8' : '#89dceb';
-      ctx.fill();
+  // Pipe boundaries (faint)
+  if (pipes.length <= 80) {
+    ctx.strokeStyle='rgba(37,48,72,.9)'; ctx.lineWidth=0.5;
+    pipes.forEach(p => {
+      const x = xOf(parseFloat(p.startM));
+      ctx.beginPath(); ctx.moveTo(x,PAD_T); ctx.lineTo(x,PAD_T+cH); ctx.stroke();
     });
   }
 
-  // X-axis labels
-  ctx.fillStyle = '#3d4f6c'; ctx.font = '8px IBM Plex Mono,monospace'; ctx.textAlign = 'center';
-  const step = Math.max(1, Math.floor(n / 8));
-  for (let i = 0; i < n; i += step) {
-    ctx.fillText(pipes[i].pipeNo, xOf(i), H - 8);
+  if (hasProfile) {
+    // L, C, R lines
+    const cols=['#89dceb','#a6e3a1','#f9e2af'];
+    for (let vi=0; vi<3; vi++) {
+      const pts = profileRows.map(r => ({ pos:r.pos, val:(r.vals||[])[vi] }))
+                             .filter(p => p.val!==''&&!isNaN(p.val)&&p.val!==undefined);
+      if (pts.length < 2) continue;
+      ctx.beginPath(); ctx.strokeStyle=cols[vi]; ctx.lineWidth=1.2; ctx.globalAlpha=0.7;
+      pts.forEach((p,i) => i===0 ? ctx.moveTo(xOf(p.pos),yOf(Number(p.val))) : ctx.lineTo(xOf(p.pos),yOf(Number(p.val))));
+      ctx.stroke(); ctx.globalAlpha=1;
+      pts.forEach(p => { ctx.beginPath(); ctx.arc(xOf(p.pos),yOf(Number(p.val)),2.5,0,Math.PI*2); ctx.fillStyle=cols[vi]; ctx.fill(); });
+    }
+    // Average per-pipe (purple)
+    ctx.beginPath(); ctx.strokeStyle='#cba6f7'; ctx.lineWidth=2;
+    pipes.forEach((p,i) => { const x=xOf(p.midM); i===0?ctx.moveTo(x,yOf(p.thkAvg)):ctx.lineTo(x,yOf(p.thkAvg)); });
+    ctx.stroke();
+  } else {
+    // No profile: step line
+    ctx.beginPath(); ctx.strokeStyle='rgba(203,166,247,.6)'; ctx.lineWidth=1.5;
+    pipes.forEach((p,i) => {
+      const x1=xOf(parseFloat(p.startM)), x2=xOf(parseFloat(p.endM)), y=yOf(p.thkAvg);
+      if(i===0) ctx.moveTo(x1,y); ctx.lineTo(x1,y); ctx.lineTo(x2,y);
+    });
+    ctx.stroke();
+    ctx.fillStyle='rgba(203,166,247,.5)'; ctx.font='9px IBM Plex Mono,monospace'; ctx.textAlign='center';
+    ctx.fillText('ไม่มี Profile — ใช้ค่า Nominal', PAD_L+cW/2, PAD_T+cH/2);
   }
-  ctx.fillText('เส้น#', W - 20, H - 8);
+
+  // X labels
+  ctx.fillStyle='#3d4f6c'; ctx.font='8px IBM Plex Mono,monospace'; ctx.textAlign='center';
+  const xStep = Math.max(100, Math.floor(coilLenM/6/100)*100);
+  for (let pos=0; pos<=coilLenM; pos+=xStep) ctx.fillText(pos+'m', xOf(pos), H-6);
+}
+
+// ═══════════════════════════════════════════
+// CHART B: Weight per pipe
+// ═══════════════════════════════════════════
+function drawWeightChart(pipes, avgW, tolPct, source, hoverIdx=-1) {
+  const canvas = document.getElementById('weight-chart');
+  const W = canvas.parentElement.clientWidth - 24;
+  const H = 170;
+  canvas.width=W; canvas.height=H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  const PAD_L=48, PAD_R=10, PAD_T=14, PAD_B=24;
+  const cW=W-PAD_L-PAD_R, cH=H-PAD_T-PAD_B;
+  const n=pipes.length; if(!n) return;
+
+  const allV = pipes.flatMap(p=>[p.profileWt,p.nomWt]);
+  const vMin=Math.min(...allV)*0.985, vMax=Math.max(...allV)*1.015, vRng=vMax-vMin||1;
+  function xOf(i)   { return PAD_L+(i/(n-1||1))*cW; }
+  function yOf(val) { return PAD_T+cH-((val-vMin)/vRng)*cH; }
+
+  // Grid
+  ctx.strokeStyle='#253048'; ctx.lineWidth=0.5;
+  for (let i=0; i<=4; i++) {
+    const y=PAD_T+(cH/4)*i;
+    ctx.beginPath(); ctx.moveTo(PAD_L,y); ctx.lineTo(PAD_L+cW,y); ctx.stroke();
+    ctx.fillStyle='#3d4f6c'; ctx.font='8px IBM Plex Mono,monospace'; ctx.textAlign='right';
+    ctx.fillText((vMax-vRng/4*i).toFixed(3), PAD_L-3, y+3);
+  }
+  // Tolerance band
+  const yU=yOf(avgW*(1+tolPct/100)), yL=yOf(avgW*(1-tolPct/100));
+  ctx.fillStyle='rgba(243,139,168,.05)'; ctx.fillRect(PAD_L,Math.min(yU,yL),cW,Math.abs(yL-yU));
+  ctx.strokeStyle='rgba(243,139,168,.3)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+  [yU,yL].forEach(y=>{ ctx.beginPath(); ctx.moveTo(PAD_L,y); ctx.lineTo(PAD_L+cW,y); ctx.stroke(); });
+  ctx.setLineDash([]);
+  // Avg
+  ctx.strokeStyle='rgba(137,220,235,.3)'; ctx.lineWidth=1; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(PAD_L,yOf(avgW)); ctx.lineTo(PAD_L+cW,yOf(avgW)); ctx.stroke();
+  ctx.setLineDash([]);
+  // Nominal
+  if (source!=='profile'&&n>1) {
+    ctx.beginPath(); ctx.strokeStyle='rgba(166,227,161,.5)'; ctx.lineWidth=1.5;
+    pipes.forEach((p,i) => i===0?ctx.moveTo(xOf(i),yOf(p.nomWt)):ctx.lineTo(xOf(i),yOf(p.nomWt)));
+    ctx.stroke();
+  }
+  // Profile line
+  if (source!=='nominal'&&n>1) {
+    ctx.beginPath(); ctx.strokeStyle='#89dceb'; ctx.lineWidth=2;
+    pipes.forEach((p,i) => i===0?ctx.moveTo(xOf(i),yOf(p.profileWt)):ctx.lineTo(xOf(i),yOf(p.profileWt)));
+    ctx.stroke();
+    // Dots
+    pipes.forEach((p,i) => {
+      const isWarn=Math.abs(p.delta)>tolPct, isHover=i===hoverIdx;
+      const r = isHover?6:(n>80?1.5:3);
+      ctx.beginPath(); ctx.arc(xOf(i),yOf(p.profileWt),r,0,Math.PI*2);
+      ctx.fillStyle = isHover?'#ffffff':(isWarn?'#f38ba8':'#89dceb'); ctx.fill();
+      if (isHover) {
+        ctx.beginPath(); ctx.arc(xOf(i),yOf(p.profileWt),9,0,Math.PI*2);
+        ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.lineWidth=1.5; ctx.stroke();
+      }
+    });
+  }
+  // Hover cursor
+  if (hoverIdx>=0&&hoverIdx<n) {
+    const x=xOf(hoverIdx);
+    ctx.strokeStyle='rgba(255,255,255,.3)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(x,PAD_T); ctx.lineTo(x,PAD_T+cH); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  // X labels
+  ctx.fillStyle='#3d4f6c'; ctx.font='8px IBM Plex Mono,monospace'; ctx.textAlign='center';
+  const labelStep=Math.max(1,Math.floor(n/7));
+  for (let i=0; i<n; i+=labelStep) ctx.fillText(pipes[i].pipeNo, xOf(i), H-6);
+}
+
+// ═══════════════════════════════════════════
+// CHART HOVER — linked dual canvas
+// ═══════════════════════════════════════════
+function setupChartHover() {
+  ['thk-profile-canvas','weight-chart'].forEach(id => {
+    const c = document.getElementById(id);
+    const newC = c.cloneNode(true); c.parentNode.replaceChild(newC, c); // remove old listeners
+    newC.addEventListener('mousemove',  e => handleChartMove(e, newC, false));
+    newC.addEventListener('mouseleave', hideTooltip);
+    newC.addEventListener('touchmove',  e => { e.preventDefault(); handleChartMove(e.touches[0], newC, true); }, {passive:false});
+    newC.addEventListener('touchend',   hideTooltip);
+  });
+  // Re-draw after clone (canvas content lost)
+  if (_chartData) {
+    const {pipes,profileRows,coilLenM,nom_thk,tolPct,source} = _chartData;
+    const avgW = pipes.reduce((a,b)=>a+b.profileWt,0)/pipes.length;
+    drawThkProfileCanvas(pipes,profileRows,coilLenM,nom_thk);
+    drawWeightChart(pipes,avgW,tolPct,source);
+  }
+}
+
+function handleChartMove(e, canvas, isTouch) {
+  if (!_chartData) return;
+  const {pipes,profileRows,coilLenM,nom_thk,tolPct,source} = _chartData;
+  if (!pipes||!pipes.length) return;
+  const rect = canvas.getBoundingClientRect();
+  const rawX = e.clientX - rect.left;
+  const PAD_L=44; const cW=canvas.width-PAD_L-10;
+  const frac = Math.max(0,Math.min(1,(rawX-PAD_L)/cW));
+  const idx  = Math.min(Math.round(frac*(pipes.length-1)), pipes.length-1);
+  const p    = pipes[idx]; if(!p) return;
+
+  // Update tooltip
+  document.getElementById('tt-pos').textContent      = `${p.startM}–${p.endM} m`;
+  document.getElementById('tt-thkL').textContent     = p.thkL!=null ? p.thkL.toFixed(4)+' mm' : '—';
+  document.getElementById('tt-thkC').textContent     = p.thkC!=null ? p.thkC.toFixed(4)+' mm' : '—';
+  document.getElementById('tt-thkR').textContent     = p.thkR!=null ? p.thkR.toFixed(4)+' mm' : '—';
+  document.getElementById('tt-thkAvg').textContent   = p.thkAvg.toFixed(4)+' mm';
+  document.getElementById('tt-wt-profile').textContent = p.profileWt.toFixed(4)+' kg';
+  document.getElementById('tt-wt-nom').textContent   = p.nomWt.toFixed(4)+' kg';
+  document.getElementById('tt-nom-row').style.display = source==='profile'?'none':'';
+  const warn = Math.abs(p.delta)>tolPct;
+  document.getElementById('tt-pipe-no').innerHTML    =
+    `เส้นที่ ${p.pipeNo}${warn?` <span style="color:var(--red)">⚠ ${p.delta>=0?'+':''}${p.delta.toFixed(2)}%</span>`:''}`;
+
+  const tt = document.getElementById('sim-tooltip');
+  tt.style.left=''; tt.style.right='';
+  const vx = e.clientX+14, vy = e.clientY-10;
+  const ttW = 200;
+  if (vx+ttW > window.innerWidth) tt.style.right=(window.innerWidth-e.clientX+4)+'px';
+  else tt.style.left=vx+'px';
+  tt.style.top=vy+'px'; tt.style.display='block';
+
+  // Redraw both charts with highlight
+  const avgW = pipes.reduce((a,b)=>a+b.profileWt,0)/pipes.length;
+  drawWeightChart(pipes,avgW,tolPct,source,idx);
+  drawThkCursor(idx,pipes,coilLenM,nom_thk,profileRows);
+}
+
+function hideTooltip() {
+  document.getElementById('sim-tooltip').style.display='none';
+  if (_chartData) {
+    const {pipes,profileRows,coilLenM,nom_thk,tolPct,source}=_chartData;
+    const avgW=pipes.reduce((a,b)=>a+b.profileWt,0)/pipes.length;
+    drawWeightChart(pipes,avgW,tolPct,source,-1);
+    drawThkProfileCanvas(pipes,profileRows,coilLenM,nom_thk);
+  }
+}
+
+function drawThkCursor(idx, pipes, coilLenM, nomThk, profileRows) {
+  // Redraw thk canvas then overlay highlight
+  drawThkProfileCanvas(pipes, profileRows, coilLenM, nomThk);
+  const canvas = document.getElementById('thk-profile-canvas');
+  const ctx    = canvas.getContext('2d');
+  const PAD_L=44, PAD_R=10, PAD_T=10, PAD_B=22;
+  const cW=canvas.width-PAD_L-PAD_R, cH=canvas.height-PAD_T-PAD_B;
+  const p=pipes[idx]; if(!p) return;
+  const xS=PAD_L+(parseFloat(p.startM)/coilLenM)*cW;
+  const xE=PAD_L+(parseFloat(p.endM)/coilLenM)*cW;
+  // Highlight band
+  ctx.fillStyle='rgba(137,220,235,.1)';
+  ctx.fillRect(xS,PAD_T,xE-xS,cH);
+  ctx.strokeStyle='rgba(137,220,235,.6)'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(xS,PAD_T); ctx.lineTo(xS,PAD_T+cH);
+  ctx.moveTo(xE,PAD_T); ctx.lineTo(xE,PAD_T+cH); ctx.stroke();
+  // Pipe number label
+  ctx.fillStyle='rgba(137,220,235,.9)'; ctx.font='bold 9px IBM Plex Mono,monospace'; ctx.textAlign='center';
+  ctx.fillText('#'+p.pipeNo, (xS+xE)/2, PAD_T+cH+15);
 }
 
 // ═══════════════════════════════════════════
 // ALERTS
 // ═══════════════════════════════════════════
 function renderWeightAlerts(pipes, tolPct) {
-  const alertEl = document.getElementById('weight-alerts');
+  const el = document.getElementById('weight-alerts');
   const warnPipes = pipes.filter(p => Math.abs(p.delta) > tolPct);
-  if (warnPipes.length === 0) {
-    alertEl.style.display = 'none'; return;
-  }
-  alertEl.style.display = 'block';
-  alertEl.innerHTML = `
-    <div class="alert-badge">
-      <div class="icon">⚠️</div>
-      <div>
-        <div style="font-weight:700;color:var(--yellow);margin-bottom:4px">
-          พบ ${warnPipes.length} เส้นที่น้ำหนักเบี่ยงเบน > ${tolPct}%
-        </div>
-        <div style="font-family:var(--mono);font-size:11px;color:var(--muted)">
-          เส้น: ${warnPipes.map(p => p.pipeNo).slice(0, 10).join(', ')}${warnPipes.length > 10 ? ` ... +${warnPipes.length - 10}` : ''}
-        </div>
-      </div>
-    </div>`;
+  if (!warnPipes.length) { el.style.display='none'; return; }
+  el.style.display='block';
+  el.innerHTML=`<div class="alert-badge"><div class="icon">⚠️</div><div>
+    <div style="font-weight:700;color:var(--yellow);margin-bottom:4px">พบ ${warnPipes.length} เส้นที่น้ำหนักเบี่ยงเบน > ${tolPct}%</div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted)">เส้น: ${warnPipes.map(p=>p.pipeNo).slice(0,12).join(', ')}${warnPipes.length>12?` ... +${warnPipes.length-12}`:''}</div>
+  </div></div>`;
 }
 
 // ═══════════════════════════════════════════
 // SIMULATE TABLE
 // ═══════════════════════════════════════════
 function renderSimTable(pipes, tolPct, source) {
-  const body = document.getElementById('sim-table-body');
   const showNom = source !== 'profile';
   document.getElementById('th-nom-col').style.display = showNom ? '' : 'none';
-
-  body.innerHTML = pipes.map(p => {
+  document.getElementById('sim-table-body').innerHTML = pipes.map(p => {
     const isWarn = Math.abs(p.delta) > tolPct;
-    const rowClass = isWarn ? (Math.abs(p.delta) > tolPct * 2 ? 'danger-row' : 'warn-row') : '';
-    const statusTag = isWarn
-      ? `<span class="tag warn">⚠ +${p.delta.toFixed(1)}%</span>`
+    const rowClass = isWarn ? (Math.abs(p.delta) > tolPct*2 ? 'danger-row' : 'warn-row') : '';
+    const tag = isWarn
+      ? `<span class="tag warn">⚠ ${p.delta>=0?'+':''}${p.delta.toFixed(1)}%</span>`
       : `<span class="tag pass">OK</span>`;
     return `<tr class="${rowClass}">
       <td>${p.pipeNo}</td>
       <td>${p.startM}–${p.endM}</td>
-      <td>${p.profileThk.toFixed(4)} mm</td>
+      <td>${p.thkAvg.toFixed(4)} mm</td>
       <td>${p.profileWt.toFixed(4)}</td>
       <td style="display:${showNom?'':'none'}">${p.nomWt.toFixed(4)}</td>
-      <td>${p.delta >= 0 ? '+' : ''}${p.delta.toFixed(2)}%</td>
-      <td>${statusTag}</td>
+      <td>${p.delta>=0?'+':''}${p.delta.toFixed(2)}%</td>
+      <td>${tag}</td>
     </tr>`;
   }).join('');
 }
@@ -1207,21 +1415,21 @@ function loadInventory() {
     '<div class="empty-icon"><span class="spinner"></span></div><div>กำลังโหลด...</div>';
   callGAS('getSlitInventory', [])
     .then(res => {
-      if (res.error) { toast('❌ ' + res.error, 'err'); return; }
+      if (res.error) { toast('❌ '+res.error,'err'); return; }
       inventoryData = res.result || [];
       buildInvFilters();
       renderInventoryTable();
     })
-    .catch(() => toast('❌ เชื่อมต่อ GAS ไม่ได้', 'err'));
+    .catch(() => toast('❌ เชื่อมต่อ GAS ไม่ได้','err'));
 }
 
 function buildInvFilters() {
-  const widths = [...new Set(inventoryData.map(s => s.width).filter(v => v > 0))].sort((a,b)=>a-b);
-  const grades = [...new Set(inventoryData.map(s => s.grade).filter(Boolean))].sort();
-  const wSel = document.getElementById('inv-filter-width');
-  const gSel = document.getElementById('inv-filter-grade');
-  wSel.innerHTML = '<option value="">ทั้งหมด</option>' + widths.map(w => `<option value="${w}">${w} mm</option>`).join('');
-  gSel.innerHTML = '<option value="">ทั้งหมด</option>' + grades.map(g => `<option value="${g}">${g}</option>`).join('');
+  const widths=[...new Set(inventoryData.map(s=>s.width).filter(v=>v>0))].sort((a,b)=>a-b);
+  const grades=[...new Set(inventoryData.map(s=>s.grade).filter(Boolean))].sort();
+  const wSel=document.getElementById('inv-filter-width');
+  const gSel=document.getElementById('inv-filter-grade');
+  wSel.innerHTML='<option value="">ทั้งหมด</option>'+widths.map(w=>`<option value="${w}">${w} mm</option>`).join('');
+  gSel.innerHTML='<option value="">ทั้งหมด</option>'+grades.map(g=>`<option value="${g}">${g}</option>`).join('');
 }
 
 function renderInventoryTable() {
