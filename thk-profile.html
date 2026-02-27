@@ -324,38 +324,170 @@ canvas#profileCanvas { display: block; cursor: crosshair; }
 
 /* ─── HISTORY SCREEN ─── */
 #screen-history { display: none; }
-.history-filter {
+/* ─── HISTORY ─── */
+.history-search-bar {
   background: var(--panel);
   border-bottom: 1px solid var(--border);
   padding: 12px 16px;
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-  flex-wrap: wrap;
+  position: relative;
 }
-.history-list { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.search-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--muted);
+  font-size: 15px;
+  pointer-events: none;
+  z-index: 1;
+}
+.history-search-input {
+  width: 100%;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 15px;
+  padding: 11px 44px 11px 40px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  -webkit-appearance: none;
+}
+.history-search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(137,220,235,0.12);
+}
+.btn-clear-search {
+  position: absolute;
+  right: 12px;
+  background: var(--muted);
+  border: none;
+  border-radius: 50%;
+  width: 20px; height: 20px;
+  color: #0a0e14;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.btn-clear-search.show { display: flex; }
+/* Suggestion dropdown */
+.search-suggest {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0; right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  z-index: 99;
+  max-height: 220px;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.search-suggest.open { display: block; }
+.suggest-item {
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.1s;
+}
+.suggest-item:last-child { border-bottom: none; }
+.suggest-item:active { background: var(--panel); }
+.suggest-main { font-family: var(--mono); font-size: 13px; color: var(--accent); }
+.suggest-sub  { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.suggest-icon { font-size: 16px; flex-shrink: 0; }
+.btn-search {
+  display: none; /* ซ่อนปุ่มค้นหาแยก — ค้นหา realtime แทน */
+}
+.search-result-count {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 6px 0 2px;
+  text-align: right;
+}
+.filter-chips {
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px 10px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+.filter-chips::-webkit-scrollbar { display: none; }
+.filter-chip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.filter-chip.active { background: var(--accent); color: #0a0e14; border-color: var(--accent); }
+.filter-chip.chip-pass.active { background: var(--green); border-color: var(--green); }
+.filter-chip.chip-fail.active { background: var(--red);   border-color: var(--red); }
+.filter-chip.chip-warn.active { background: var(--orange); border-color: var(--orange); }
+
+.history-list { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+
 .history-card {
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px 16px;
+  border-radius: 14px;
+  overflow: hidden;
   cursor: pointer;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, transform 0.1s;
+  active-scale: 0.98;
 }
-.history-card:hover { border-color: var(--accent); }
+.history-card:hover  { border-color: var(--accent); }
+.history-card:active { transform: scale(0.99); }
+
+.history-card-accent {
+  height: 3px;
+  width: 100%;
+}
+.history-card-body { padding: 12px 14px 10px; }
+
 .history-card-top {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
-.history-coil-id { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--accent); }
-.history-ts { font-size: 11px; color: var(--muted); font-family: var(--mono); }
-.history-meta { display: flex; gap: 10px; flex-wrap: wrap; }
+.history-coil-id  { font-family: var(--mono); font-size: 14px; font-weight: 700; color: var(--accent); }
+.history-job-id   { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.history-ts       { font-size: 11px; color: var(--muted); font-family: var(--mono); text-align: right; }
+
+/* mini pass-rate bar */
+.mini-bar-wrap { height: 4px; background: var(--surface); border-radius: 2px; margin: 8px 0 6px; overflow: hidden; }
+.mini-bar      { height: 100%; border-radius: 2px; transition: width 0.4s ease; }
+
+.history-row2 {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.history-stat-group { display: flex; gap: 6px; flex-wrap: wrap; }
 .history-chip {
   font-family: var(--mono);
   font-size: 11px;
-  padding: 3px 8px;
+  padding: 3px 7px;
   border-radius: 6px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -364,7 +496,90 @@ canvas#profileCanvas { display: block; cursor: crosshair; }
 .st-pass { border-color: var(--green); color: var(--green); }
 .st-fail { border-color: var(--red);   color: var(--red); }
 .st-warn { border-color: var(--orange); color: var(--orange); }
+
+.history-arrow { color: var(--muted); font-size: 16px; margin-left: 8px; }
+
 .history-empty { text-align: center; padding: 48px 16px; color: var(--muted); font-size: 13px; }
+
+/* ─── PROFILE DETAIL BOTTOM SHEET ─── */
+.sheet-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 300;
+  backdrop-filter: blur(2px);
+}
+.sheet-overlay.open { display: block; }
+.bottom-sheet {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  border-radius: 20px 20px 0 0;
+  z-index: 301;
+  max-height: 88vh;
+  overflow-y: auto;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.32,0.72,0,1);
+}
+.bottom-sheet.open { transform: translateY(0); }
+.sheet-handle {
+  width: 40px; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 12px auto 0;
+}
+.sheet-header {
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.sheet-title { font-weight: 700; font-size: 15px; color: var(--accent); font-family: var(--mono); }
+.sheet-close {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.sheet-body { padding: 14px 16px 32px; }
+.sheet-meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.sheet-meta-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.sheet-meta-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 3px; }
+.sheet-meta-val   { font-family: var(--mono); font-size: 15px; font-weight: 600; }
+.sheet-actions { display: flex; gap: 8px; margin-top: 14px; }
+.btn-sheet-action {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 11px;
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s;
+}
+.btn-sheet-action:hover { border-color: var(--accent); color: var(--accent); }
+.btn-sheet-action.primary { background: var(--accent); color: #0a0e14; border-color: var(--accent); }
+/* mini chart in sheet */
+.sheet-canvas-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px; margin-top: 10px; overflow-x: auto; }
 
 /* ─── TOOLTIP ─── */
 #tooltip {
@@ -578,17 +793,45 @@ canvas#profileCanvas { display: block; cursor: crosshair; }
 <!-- SCREEN: HISTORY -->
 <!-- ══════════════════════════════════════════════════ -->
 <div id="screen-history" style="display:none;">
-  <div class="history-filter">
-    <div class="setup-field">
-      <label class="setup-label">กรอง Job ID / Slit ID</label>
-      <input class="setup-input" id="hist-filter-id" placeholder="ว่าง = ทั้งหมด">
+  <!-- Search bar -->
+  <div class="history-search-bar">
+    <div class="search-input-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="history-search-input" id="hist-filter-id"
+        placeholder="ค้นหา Job ID หรือ Slit ID..."
+        oninput="onHistSearchInput(this.value)"
+        onkeydown="onSearchKeydown(event)"
+        autocomplete="off" autocorrect="off" spellcheck="false">
+      <button class="btn-clear-search" id="btn-clear-search" onclick="clearSearch()">✕</button>
     </div>
-    <button class="btn-generate" onclick="loadHistory()">🔍 ค้นหา</button>
-    <button class="btn-generate" style="background:var(--surface); color:var(--text); border:1px solid var(--border);" onclick="loadHistory('')">↺ ทั้งหมด</button>
+    <div class="search-suggest" id="search-suggest"></div>
+    <div class="search-result-count" id="search-result-count"></div>
   </div>
+
+  <!-- Quick filter chips -->
+  <div class="filter-chips" id="filter-chips">
+    <span class="filter-chip active" data-filter="all"   onclick="setFilterChip('all')">ทั้งหมด</span>
+    <span class="filter-chip chip-pass" data-filter="PASS" onclick="setFilterChip('PASS')">✅ PASS</span>
+    <span class="filter-chip chip-warn" data-filter="WARN" onclick="setFilterChip('WARN')">⚠️ WARN</span>
+    <span class="filter-chip chip-fail" data-filter="FAIL" onclick="setFilterChip('FAIL')">❌ FAIL</span>
+    <span class="filter-chip" data-filter="today" onclick="setFilterChip('today')">วันนี้</span>
+    <span class="filter-chip" data-filter="week"  onclick="setFilterChip('week')">สัปดาห์นี้</span>
+  </div>
+
   <div class="history-list" id="history-list">
-    <div class="history-empty">กด "ค้นหา" เพื่อโหลดประวัติ</div>
+    <div class="history-empty">กำลังโหลด...</div>
   </div>
+</div>
+
+<!-- BOTTOM SHEET: Profile Detail -->
+<div class="sheet-overlay" id="sheet-overlay" onclick="closeSheet()"></div>
+<div class="bottom-sheet" id="bottom-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-header">
+    <div class="sheet-title" id="sheet-title">—</div>
+    <button class="sheet-close" onclick="closeSheet()">✕ ปิด</button>
+  </div>
+  <div class="sheet-body" id="sheet-body"></div>
 </div>
 
 <div id="tooltip"></div>
@@ -599,7 +842,7 @@ canvas#profileCanvas { display: block; cursor: crosshair; }
 // CONFIG
 // ══════════════════════════════════════════════════════════════
 // ⚠️ ให้ใช้ GAS URL เดียวกับ SM Production App
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbyHgWWLbIt0n7BUmGvZSLBbeuQjQJ0GXZ4QaUuBSyFSgQkkvUpCYPPC_3SkoOBz53jh/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwcZesY-cNsIkfIIBhFIh4l1GHUyIo3rEKXjv2V3qCa594wqG7pve06I7mRrn74taoZ/exec';
 
 // ══════════════════════════════════════════════════════════════
 // STATE
@@ -671,6 +914,8 @@ function switchMainTab(tab) {
   document.getElementById('screen-history').style.display = tab === 'history' ? '' : 'none';
   document.getElementById('tab-new').classList.toggle('active',     tab === 'new');
   document.getElementById('tab-history').classList.toggle('active', tab === 'history');
+  // Auto-load history ครั้งแรกที่เปิด tab
+  if (tab === 'history' && !_historyAll.length) loadHistory('');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -1202,52 +1447,353 @@ function exportCSV() {
 // ══════════════════════════════════════════════════════════════
 // HISTORY
 // ══════════════════════════════════════════════════════════════
+// ── History state ──
+let _historyAll    = [];   // raw data from GAS
+let _historyFilter = 'all'; // current chip filter
+let _histSearchQ   = '';
+
+function onHistSearchInput(val) {
+  _histSearchQ = val.trim();
+  // แสดง/ซ่อนปุ่ม clear
+  const clearBtn = document.getElementById('btn-clear-search');
+  if (clearBtn) clearBtn.classList.toggle('show', val.length > 0);
+  // แสดง suggestion ถ้าพิมพ์ >= 1 ตัวอักษร
+  if (val.trim().length >= 1) {
+    showSuggestions(val.trim());
+  } else {
+    hideSuggestions();
+  }
+  renderHistoryList();
+}
+
+function onSearchKeydown(e) {
+  if (e.key === 'Enter') {
+    hideSuggestions();
+    e.target.blur(); // ซ่อน keyboard มือถือ
+  }
+  if (e.key === 'Escape') { clearSearch(); }
+}
+
+function clearSearch() {
+  const inp = document.getElementById('hist-filter-id');
+  inp.value = '';
+  _histSearchQ = '';
+  document.getElementById('btn-clear-search')?.classList.remove('show');
+  hideSuggestions();
+  renderHistoryList();
+  inp.focus();
+}
+
+function showSuggestions(q) {
+  const box = document.getElementById('search-suggest');
+  if (!box || !_historyAll.length) return;
+
+  const ql = q.toLowerCase();
+  // สร้าง unique list ของ coilId + jobId ที่ match
+  const seen = new Set();
+  const matches = [];
+  _historyAll.forEach(p => {
+    const coil = p.coilId || '';
+    const job  = p.jobId  || '';
+    if (coil.toLowerCase().includes(ql) && !seen.has(coil)) {
+      seen.add(coil);
+      matches.push({ label: coil, sub: job ? 'Job: ' + job : '', icon: '🪄', type: 'coil' });
+    } else if (job.toLowerCase().includes(ql) && !seen.has('J:'+job)) {
+      seen.add('J:'+job);
+      matches.push({ label: job, sub: 'Job ID', icon: '📋', type: 'job' });
+    }
+  });
+
+  if (!matches.length) { hideSuggestions(); return; }
+
+  box.innerHTML = matches.slice(0, 8).map(m => `
+    <div class="suggest-item" onclick="selectSuggest('${m.label}', '${m.type}')">
+      <span class="suggest-icon">${m.icon}</span>
+      <div>
+        <div class="suggest-main">${highlightMatch(m.label, q)}</div>
+        ${m.sub ? `<div class="suggest-sub">${m.sub}</div>` : ''}
+      </div>
+    </div>`).join('');
+  box.classList.add('open');
+}
+
+function highlightMatch(text, q) {
+  const idx = text.toLowerCase().indexOf(q.toLowerCase());
+  if (idx < 0) return text;
+  return text.slice(0, idx)
+    + `<span style="color:var(--accent);font-weight:700">${text.slice(idx, idx+q.length)}</span>`
+    + text.slice(idx + q.length);
+}
+
+function selectSuggest(val, type) {
+  const inp = document.getElementById('hist-filter-id');
+  inp.value = val;
+  _histSearchQ = val;
+  document.getElementById('btn-clear-search')?.classList.add('show');
+  hideSuggestions();
+  inp.blur();
+  renderHistoryList();
+}
+
+function hideSuggestions() {
+  document.getElementById('search-suggest')?.classList.remove('open');
+}
+
+// ปิด suggestion เมื่อแตะที่อื่น
+document.addEventListener('click', e => {
+  if (!e.target.closest('.history-search-bar')) hideSuggestions();
+});
+
+function setFilterChip(filter) {
+  _historyFilter = filter;
+  document.querySelectorAll('.filter-chip').forEach(el => {
+    el.classList.toggle('active', el.dataset.filter === filter);
+  });
+  renderHistoryList();
+}
+
 function loadHistory(filterJobId) {
-  const q   = filterJobId !== undefined ? filterJobId : document.getElementById('hist-filter-id').value.trim();
-  const el  = document.getElementById('history-list');
+  const q = filterJobId !== undefined
+    ? filterJobId
+    : document.getElementById('hist-filter-id').value.trim();
+  _histSearchQ = q;
+  if (q) {
+    document.getElementById('hist-filter-id').value = q;
+    document.getElementById('btn-clear-search')?.classList.add('show');
+  }
+
+  const el = document.getElementById('history-list');
   el.innerHTML = `<div class="history-empty"><span class="spinner"></span> กำลังโหลด...</div>`;
 
-  callGAS('getThicknessProfiles', [q])
+  callGAS('getThicknessProfiles', [''])
     .then(d => {
-      const list = d.result || [];
-      if (!list.length) {
-        el.innerHTML = `<div class="history-empty">ไม่พบข้อมูล${q ? ` สำหรับ "${q}"` : ''}</div>`;
+      _historyAll = d.result || [];
+      if (!_historyAll.length) {
+        el.innerHTML = `<div class="history-empty">ยังไม่มีข้อมูล</div>`;
         return;
       }
-      el.innerHTML = list.map((p, idx) => `
-        <div class="history-card" onclick="viewHistoryProfile(${idx})" data-idx="${idx}">
-          <div class="history-card-top">
-            <div>
-              <div class="history-coil-id">${p.coilId || '—'}</div>
-              ${p.jobId ? `<div style="font-size:11px;color:var(--muted);margin-top:2px;">Job: ${p.jobId}</div>` : ''}
-            </div>
-            <div class="history-ts">${p.timestamp}</div>
-          </div>
-          <div class="history-meta">
-            <span class="history-chip ${p.status==='PASS'?'st-pass':p.status==='FAIL'?'st-fail':'st-warn'}">${p.status||'—'}</span>
-            <span class="history-chip">Pass ${p.passRate}%</span>
-            <span class="history-chip">Target ${p.target} mm</span>
-            <span class="history-chip">${p.ptCount} จุด · ${p.interval}m</span>
-            <span class="history-chip">${p.rows?.length||0} ตำแหน่ง</span>
-          </div>
-        </div>`).join('');
-
-      // เก็บ data ไว้สำหรับ view
-      window._historyData = list;
-      toast(`✅ พบ ${list.length} รายการ`, 'ok');
+      renderHistoryList();
     })
     .catch(() => {
       el.innerHTML = `<div class="history-empty">⚠️ เชื่อมต่อ GAS ไม่ได้</div>`;
     });
 }
 
-function viewHistoryProfile(idx) {
-  const p = window._historyData?.[idx];
+function renderHistoryList() {
+  const el    = document.getElementById('history-list');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const weekAgo = new Date(today); weekAgo.setDate(today.getDate() - 7);
+
+  let list = _historyAll.filter(p => {
+    // text search
+    if (_histSearchQ) {
+      const q = _histSearchQ.toLowerCase();
+      if (!p.coilId.toLowerCase().includes(q) && !p.jobId.toLowerCase().includes(q)) return false;
+    }
+    // chip filter
+    if (_historyFilter === 'PASS' && p.status !== 'PASS') return false;
+    if (_historyFilter === 'FAIL' && p.status !== 'FAIL') return false;
+    if (_historyFilter === 'WARN' && p.status !== 'WARN') return false;
+    if (_historyFilter === 'today') {
+      const d = parseThaiDate(p.timestamp);
+      if (!d || d < today) return false;
+    }
+    if (_historyFilter === 'week') {
+      const d = parseThaiDate(p.timestamp);
+      if (!d || d < weekAgo) return false;
+    }
+    return true;
+  });
+
+  if (!list.length) {
+    el.innerHTML = `<div class="history-empty">ไม่พบข้อมูลที่ตรงกัน</div>`;
+    return;
+  }
+
+  // แสดงจำนวนผลลัพธ์
+  const countEl = document.getElementById('search-result-count');
+  if (countEl) countEl.textContent = list.length < _historyAll.length ? `แสดง ${list.length} จาก ${_historyAll.length} รายการ` : `${list.length} รายการ`;
+
+  el.innerHTML = list.map((p, idx) => {
+    const stClass   = p.status==='PASS'?'st-pass':p.status==='FAIL'?'st-fail':'st-warn';
+    const barColor  = p.status==='PASS'?'var(--green)':p.status==='FAIL'?'var(--red)':'var(--orange)';
+    const accentClr = p.status==='PASS'?'#a6e3a1':p.status==='FAIL'?'#f38ba8':'#fab387';
+    const origIdx   = _historyAll.indexOf(p);
+    return `
+      <div class="history-card" onclick="openSheet(${origIdx})">
+        <div class="history-card-accent" style="background:${accentClr}"></div>
+        <div class="history-card-body">
+          <div class="history-card-top">
+            <div>
+              <div class="history-coil-id">${p.coilId || '—'}</div>
+              ${p.jobId ? `<div class="history-job-id">Job: ${p.jobId}</div>` : ''}
+            </div>
+            <div class="history-ts">${p.timestamp}</div>
+          </div>
+          <div class="mini-bar-wrap">
+            <div class="mini-bar" style="width:${p.passRate||0}%;background:${barColor}"></div>
+          </div>
+          <div class="history-row2">
+            <div class="history-stat-group">
+              <span class="history-chip ${stClass}">${p.status||'—'}</span>
+              <span class="history-chip">${p.passRate}%</span>
+              <span class="history-chip">${p.target} mm</span>
+              <span class="history-chip">${p.rows?.length||0} จุด</span>
+            </div>
+            <span class="history-arrow">›</span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  window._historyData = _historyAll;
+}
+
+function parseThaiDate(str) {
+  // format: "dd/MM/yyyy HH:mm"
+  try {
+    const [datePart] = str.split(' ');
+    const [d, m, y]  = datePart.split('/');
+    return new Date(+y, +m-1, +d);
+  } catch { return null; }
+}
+
+// ── Bottom Sheet ──
+function openSheet(idx) {
+  const p = _historyAll[idx];
   if (!p) return;
 
-  // โหลดข้อมูล profile เก่ากลับเข้า editor
-  switchMainTab('new');
+  const stClass  = p.status==='PASS'?'st-pass':p.status==='FAIL'?'st-fail':'st-warn';
+  const barColor = p.status==='PASS'?'var(--green)':p.status==='FAIL'?'var(--red)':'var(--orange)';
 
+  document.getElementById('sheet-title').textContent = p.coilId || '—';
+  document.getElementById('sheet-body').innerHTML = `
+    <div class="sheet-meta-grid">
+      <div class="sheet-meta-card">
+        <div class="sheet-meta-label">Status</div>
+        <div class="sheet-meta-val ${stClass}">${p.status||'—'}</div>
+      </div>
+      <div class="sheet-meta-card">
+        <div class="sheet-meta-label">Pass Rate</div>
+        <div class="sheet-meta-val" style="color:${barColor}">${p.passRate}%</div>
+      </div>
+      <div class="sheet-meta-card">
+        <div class="sheet-meta-label">Target</div>
+        <div class="sheet-meta-val">${p.target} mm</div>
+      </div>
+      <div class="sheet-meta-card">
+        <div class="sheet-meta-label">Spec</div>
+        <div class="sheet-meta-val" style="font-size:12px;">${p.specMin} – ${p.specMax}</div>
+      </div>
+      <div class="sheet-meta-card">
+        <div class="sheet-meta-label">จำนวนจุดวัด</div>
+        <div class="sheet-meta-val">${p.rows?.length||0} ตำแหน่ง</div>
+      </div>
+      <div class="sheet-meta-card">
+        <div class="sheet-meta-label">บันทึกเมื่อ</div>
+        <div class="sheet-meta-val" style="font-size:12px;">${p.timestamp}</div>
+      </div>
+    </div>
+    ${p.jobId ? `<div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Job: <span style="color:var(--text)">${p.jobId}</span></div>` : ''}
+    <div class="pass-bar-wrap"><div class="pass-bar" style="width:${p.passRate||0}%;background:${barColor}"></div></div>
+    <div class="sheet-canvas-wrap">
+      <canvas id="sheet-canvas" height="140"></canvas>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-sheet-action" onclick="closeSheet(); loadIntoEditor(${idx})">✏️ แก้ไข / ดูกราฟเต็ม</button>
+      <button class="btn-sheet-action primary" onclick="closeSheet(); loadIntoEditor(${idx})">📂 โหลดเข้า Editor</button>
+    </div>`;
+
+  document.getElementById('sheet-overlay').classList.add('open');
+  document.getElementById('bottom-sheet').classList.add('open');
+
+  // วาด mini chart หลัง DOM render
+  requestAnimationFrame(() => drawSheetCanvas(p));
+}
+
+function closeSheet() {
+  document.getElementById('sheet-overlay').classList.remove('open');
+  document.getElementById('bottom-sheet').classList.remove('open');
+}
+
+function drawSheetCanvas(p) {
+  const canvas = document.getElementById('sheet-canvas');
+  if (!canvas) return;
+  const wrap = canvas.parentElement;
+  const W = wrap.clientWidth - 20 || 300;
+  const H = 140;
+  canvas.width  = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  const PAD_L=40, PAD_R=10, PAD_T=14, PAD_B=24;
+  const chartW = W-PAD_L-PAD_R;
+  const chartH = H-PAD_T-PAD_B;
+  const pRows  = p.rows || [];
+  const pc     = p.ptCount || 3;
+
+  const allVals = pRows.flatMap(r => (r.vals||[]).filter(v=>v!==''&&!isNaN(v)).map(Number));
+  if (!allVals.length) {
+    ctx.fillStyle='#6c7a9c'; ctx.font='11px monospace'; ctx.textAlign='center';
+    ctx.fillText('ไม่มีข้อมูล', W/2, H/2); return;
+  }
+
+  const vMin = Math.min(...allVals, p.specMin||999) - 0.03;
+  const vMax = Math.max(...allVals, p.specMax||-999) + 0.03;
+  const vRange = vMax-vMin||0.1;
+  const maxPos = Math.max(...pRows.map(r=>r.pos||0))||1;
+
+  function xOf(pos) { return PAD_L + (pos/maxPos)*chartW; }
+  function yOf(val) { return PAD_T + chartH - ((val-vMin)/vRange)*chartH; }
+
+  // spec lines
+  if (p.specMax && p.specMin) {
+    ctx.strokeStyle='rgba(243,139,168,0.4)'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+    [p.specMax,p.specMin].forEach(sv=>{
+      ctx.beginPath(); ctx.moveTo(PAD_L,yOf(sv)); ctx.lineTo(PAD_L+chartW,yOf(sv)); ctx.stroke();
+      ctx.fillStyle='rgba(243,139,168,0.6)'; ctx.font='8px monospace'; ctx.textAlign='right';
+      ctx.fillText(sv.toFixed(3),PAD_L-2,yOf(sv)+3);
+    });
+    ctx.setLineDash([]);
+  }
+
+  // grid
+  ctx.strokeStyle='#253048'; ctx.lineWidth=0.5;
+  for(let i=0;i<=3;i++){
+    const y=PAD_T+(chartH/3)*i;
+    ctx.beginPath(); ctx.moveTo(PAD_L,y); ctx.lineTo(PAD_L+chartW,y); ctx.stroke();
+    const lbl=(vMax-(vRange/3)*i).toFixed(3);
+    ctx.fillStyle='#3d4f6c'; ctx.font='8px monospace'; ctx.textAlign='right';
+    ctx.fillText(lbl,PAD_L-3,y+3);
+  }
+
+  // lines
+  const colors=['#89dceb','#a6e3a1','#f9e2af','#cba6f7','#fab387'];
+  for(let vi=0;vi<pc;vi++){
+    const pts=pRows.map(r=>({x:r.pos,v:(r.vals||[])[vi]})).filter(pt=>pt.v!==''&&!isNaN(pt.v));
+    if(pts.length<2) continue;
+    ctx.beginPath(); ctx.strokeStyle=colors[vi]; ctx.lineWidth=1.5; ctx.globalAlpha=0.9;
+    pts.forEach((pt,i)=>{ const x=xOf(pt.x),y=yOf(Number(pt.v)); i===0?ctx.moveTo(x,y):ctx.lineTo(x,y); });
+    ctx.stroke(); ctx.globalAlpha=1;
+    pts.forEach(pt=>{
+      ctx.beginPath(); ctx.arc(xOf(pt.x),yOf(Number(pt.v)),3,0,Math.PI*2);
+      ctx.fillStyle=colors[vi]; ctx.fill();
+    });
+  }
+
+  // x labels
+  const step = maxPos<=500?100:maxPos<=2000?400:800;
+  for(let pos=0;pos<=maxPos;pos+=step){
+    ctx.fillStyle='#3d4f6c'; ctx.font='8px monospace'; ctx.textAlign='center';
+    ctx.fillText(pos+'m',xOf(pos),H-6);
+  }
+}
+
+function loadIntoEditor(idx) {
+  const p = _historyAll[idx];
+  if (!p) return;
+  switchMainTab('new');
   ptCount = p.ptCount || 3;
   document.getElementById('pt-count').value    = ptCount;
   document.getElementById('spec-target').value = p.target  || '';
@@ -1255,20 +1801,19 @@ function viewHistoryProfile(idx) {
   document.getElementById('spec-min').value    = p.specMin || '';
   document.getElementById('job-search').value  = p.coilId  || '';
   document.getElementById('header-coil-id').textContent = p.coilId || '—';
-
-  rows = (p.rows || []).map(r => ({
+  rows = (p.rows||[]).map(r=>({
     pos:  r.pos,
-    vals: Array.isArray(r.vals) ? r.vals.map(v => v === '' ? '' : Number(v)) : Array(ptCount).fill('')
+    vals: Array.isArray(r.vals)?r.vals.map(v=>v===''?'':Number(v)):Array(ptCount).fill('')
   }));
-
   renderTable();
   revalidateAll();
-  ['canvas-section','stats-section','table-section','action-row'].forEach(id => {
-    document.getElementById(id).style.display = '';
+  ['canvas-section','stats-section','table-section','action-row'].forEach(id=>{
+    document.getElementById(id).style.display='';
   });
-
-  toast(`📂 โหลด profile: ${p.coilId} (${p.timestamp})`, 'ok');
+  toast(`📂 โหลด: ${p.coilId} (${p.timestamp})`, 'ok');
 }
+
+function viewHistoryProfile(idx) { loadIntoEditor(idx); }
 
 // ══════════════════════════════════════════════════════════════
 // TOAST
