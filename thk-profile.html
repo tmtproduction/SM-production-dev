@@ -664,11 +664,12 @@ canvas#profileCanvas { display: block; cursor: crosshair; }
         <div class="setup-field">
           <label class="setup-label">ค้นหา Job ID หรือ Slit ID</label>
           <div style="position:relative;">
-            <input class="setup-input" id="job-search" placeholder="พิมพ์ Job ID เช่น J001..." oninput="searchJobs(this.value)" autocomplete="off">
+            <input class="setup-input" id="job-search" placeholder="พิมพ์ Job ID เช่น J001..." oninput="onJobSearchInput(this.value)" autocomplete="off">
             <div id="job-dropdown" style="display:none; position:absolute; top:100%; left:0; right:0; background:var(--surface); border:1px solid var(--border); border-radius:8px; z-index:99; max-height:160px; overflow-y:auto; margin-top:4px; box-shadow:0 8px 24px rgba(0,0,0,0.4);"></div>
           </div>
         </div>
-        <button class="btn-generate" onclick="loadFromGAS()">⬇ โหลด</button>
+        <button class="btn-generate" id="btn-load-gas" onclick="loadFromGAS()">⬇ โหลด</button>
+        <button class="btn-generate" style="background:var(--surface);color:var(--muted);border:1px solid var(--border);padding:8px 10px;" onclick="reloadSlitList()" title="รีเฟรชรายการ">🔄</button>
       </div>
       <div id="selected-job-card" style="display:none; background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 14px; margin-bottom:10px; flex-wrap:wrap; gap:10px;"></div>
     </div>
@@ -914,8 +915,8 @@ function switchMainTab(tab) {
   document.getElementById('screen-history').style.display = tab === 'history' ? '' : 'none';
   document.getElementById('tab-new').classList.toggle('active',     tab === 'new');
   document.getElementById('tab-history').classList.toggle('active', tab === 'history');
-  // Auto-load history ครั้งแรกที่เปิด tab
-  if (tab === 'history' && !_historyAll.length) loadHistory('');
+  // Auto-load history ทุกครั้งที่เปิด tab (เพื่อให้ข้อมูลเป็นปัจจุบันเสมอ)
+  if (tab === 'history') loadHistory('');
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -949,12 +950,19 @@ function callGAS(action, args) {
 // ══════════════════════════════════════════════════════════════
 let allSlits = [];
 
-function loadFromGAS() {
+function loadFromGAS(forceReload) {
   const q = document.getElementById('job-search').value.trim();
   if (!q) { toast('⚠️ กรุณาพิมพ์ Job ID หรือ Slit ID ก่อน', 'err'); return; }
-  if (allSlits.length) { searchJobs(q); return; }
 
-  toast('⏳ กำลังโหลดข้อมูลจาก SM Production...', 'ok');
+  // ถ้ามี cache อยู่แล้วและไม่ได้ force reload → ใช้ cache ค้นหาได้เลย
+  if (allSlits.length && !forceReload) { searchJobs(q); return; }
+
+  // Reload ใหม่จาก GAS (ล้าง cache เดิม)
+  allSlits = [];
+  const btn = document.querySelector('[onclick="loadFromGAS()"]');
+  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+
+  toast('⏳ กำลังโหลดข้อมูลจาก GAS...', 'ok');
   callGAS('getSlitInventory', [])
     .then(d => {
       const data = d.result;
@@ -962,7 +970,41 @@ function loadFromGAS() {
       if (!allSlits.length) toast('⚠️ ไม่พบข้อมูล Slit_Inventory', 'err');
       else { toast(`✅ โหลด ${allSlits.length} ม้วน`, 'ok'); searchJobs(q); }
     })
-    .catch(() => toast('⚠️ เชื่อมต่อ GAS ไม่ได้ — ใช้ "กรอกเอง" แทน', 'err'));
+    .catch(() => toast('⚠️ เชื่อมต่อ GAS ไม่ได้ — ใช้ "กรอกเอง" แทน', 'err'))
+    .finally(() => {
+      if (btn) { btn.textContent = '⬇ โหลด'; btn.disabled = false; }
+    });
+}
+
+// รีเซ็ต selectedJob และ card เมื่อพิมพ์ใหม่
+function onJobSearchInput(val) {
+  // ถ้าเปลี่ยนข้อความ → ซ่อน selected card เดิม
+  if (selectedJob && val.trim() !== selectedJob.slitId) {
+    selectedJob = null;
+    const card = document.getElementById('selected-job-card');
+    if (card) card.style.display = 'none';
+  }
+  searchJobs(val);
+}
+
+// รีเฟรชรายการ slit จาก GAS ใหม่
+function reloadSlitList() {
+  allSlits = [];
+  selectedJob = null;
+  const card = document.getElementById('selected-job-card');
+  if (card) card.style.display = 'none';
+  const q = document.getElementById('job-search').value.trim();
+  if (q) loadFromGAS(true);
+  else {
+    toast('⏳ รีเฟรชรายการ...', 'ok');
+    callGAS('getSlitInventory', [])
+      .then(d => {
+        const data = d.result;
+        allSlits = Array.isArray(data) ? data : (data?.slits || []);
+        toast(`✅ รีเฟรชแล้ว ${allSlits.length} ม้วน`, 'ok');
+      })
+      .catch(() => toast('⚠️ เชื่อมต่อ GAS ไม่ได้', 'err'));
+  }
 }
 
 function searchJobs(q) {
@@ -1565,16 +1607,21 @@ function loadHistory(filterJobId) {
   const el = document.getElementById('history-list');
   el.innerHTML = `<div class="history-empty"><span class="spinner"></span> กำลังโหลด...</div>`;
 
-  callGAS('getThicknessProfiles', [''])
+  callGAS('getThicknessProfiles', [null])
     .then(d => {
+      if (d.error) {
+        el.innerHTML = `<div class="history-empty">⚠️ GAS Error: ${d.error}</div>`;
+        return;
+      }
       _historyAll = d.result || [];
       if (!_historyAll.length) {
-        el.innerHTML = `<div class="history-empty">ยังไม่มีข้อมูล</div>`;
+        el.innerHTML = `<div class="history-empty">ยังไม่มีข้อมูลที่บันทึกไว้</div>`;
         return;
       }
       renderHistoryList();
+      toast(`✅ โหลด ${_historyAll.length} รายการ`, 'ok');
     })
-    .catch(() => {
+    .catch(err => {
       el.innerHTML = `<div class="history-empty">⚠️ เชื่อมต่อ GAS ไม่ได้</div>`;
     });
 }
