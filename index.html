@@ -1089,7 +1089,46 @@
             #run-btn-record small { display: none; }
         }
 
-    </style>
+    
+        /* Normal Dist Fullscreen Overlay */
+        #nd-fullscreen-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 9999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        #nd-fullscreen-overlay.active { display: flex; }
+        #nd-fullscreen-inner {
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            width: 100%;
+            max-width: 900px;
+            max-height: 92vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        #nd-fullscreen-close {
+            position: absolute;
+            top: 10px; right: 14px;
+            background: none; border: none;
+            font-size: 1.5rem; cursor: pointer;
+            color: #666; line-height: 1;
+        }
+        #nd-fullscreen-close:hover { color: #000; }
+        .nd-card-clickable {
+            cursor: zoom-in;
+            transition: box-shadow 0.2s;
+        }
+        .nd-card-clickable:hover {
+            box-shadow: 0 0 0 2px #4361ee55 !important;
+        }
+</style>
   </head>
   <body>
 
@@ -1118,7 +1157,10 @@
             <button onclick="enterSystem()" class="btn-main w-100 btn-lg mb-3" id="btn-enter" disabled>เข้าสู่ระบบ</button>
             <button onclick="showDashboard()" class="btn btn-light w-100 border shadow-sm text-secondary fw-bold hover-shadow">
               <i class="fa-solid fa-chart-line me-1"></i> ดูภาพรวม (Dashboard)
-          </button>
+            </button>
+            <button onclick="showExecDashboard()" class="btn btn-light w-100 border shadow-sm fw-bold hover-shadow mt-2" style="color:#4361ee;">
+              <i class="fa-solid fa-chart-pie me-1"></i> Analytics
+            </button>
           </div>
         </div>
       </div>
@@ -1592,9 +1634,90 @@
                     <!-- คำอธิบายผล -->
                 </div>
             </div>
+
+            <!-- Normal Distribution — Bell Curve + Scatter (5 ตำแหน่ง) -->
+            <div id="normal-dist-section" class="mt-4" style="display:none;">
+              <div class="d-flex align-items-center mb-2 gap-2">
+                <span style="font-size:1rem;">📊</span>
+                <strong style="font-size:0.95rem;">การแจกแจงความหนา (Normal Distribution)</strong>
+                <span class="badge bg-secondary ms-1" id="nd-sample-count">n=0</span>
+              </div>
+              <div class="row g-3">
+
+                <!-- H -->
+                <div class="col-12 col-md-6 col-xl-4">
+                  <div class="border rounded bg-white p-2 shadow-sm nd-card-clickable" onclick="openNdFullscreen('H')" title="คลิกเพื่อขยาย">
+                    <div class="text-center mb-1" style="font-size:0.8rem;font-weight:600;color:#fd7e14;">ต้นม้วน (H)</div>
+                    <div style="height:160px;" onclick="openNdFullscreen('H')" title="คลิกเพื่อขยาย"><canvas id="ndBell-H"></canvas></div>
+                    <hr class="my-1">
+                    <div style="height:90px;"><canvas id="ndScatter-H"></canvas></div>
+                    <!-- μ/σ stats -->
+                    <div id="ndStats-H" class="mt-1 px-1" style="font-size:0.72rem;line-height:1.6;"></div>
+                  </div>
+                </div>
+
+                <!-- HM -->
+                <div class="col-12 col-md-6 col-xl-4">
+                  <div class="border rounded bg-white p-2 shadow-sm nd-card-clickable" onclick="openNdFullscreen('HM')" title="คลิกเพื่อขยาย">
+                    <div class="text-center mb-1" style="font-size:0.8rem;font-weight:600;color:#ffc107;">30m แรก (HM)</div>
+                    <div style="height:160px;" onclick="openNdFullscreen('HM')" title="คลิกเพื่อขยาย"><canvas id="ndBell-HM"></canvas></div>
+                    <hr class="my-1">
+                    <div style="height:90px;"><canvas id="ndScatter-HM"></canvas></div>
+                    <!-- μ/σ stats -->
+                    <div id="ndStats-HM" class="mt-1 px-1" style="font-size:0.72rem;line-height:1.6;"></div>
+                  </div>
+                </div>
+
+                <!-- M -->
+                <div class="col-12 col-md-6 col-xl-4">
+                  <div class="border rounded bg-white p-2 shadow-sm nd-card-clickable" onclick="openNdFullscreen('M')" title="คลิกเพื่อขยาย">
+                    <div class="text-center mb-1" style="font-size:0.8rem;font-weight:600;color:#4361ee;">กลางม้วน (M)</div>
+                    <div style="height:160px;" onclick="openNdFullscreen('M')" title="คลิกเพื่อขยาย"><canvas id="ndBell-M"></canvas></div>
+                    <hr class="my-1">
+                    <div style="height:90px;"><canvas id="ndScatter-M"></canvas></div>
+                    <!-- μ/σ stats -->
+                    <div id="ndStats-M" class="mt-1 px-1" style="font-size:0.72rem;line-height:1.6;"></div>
+                  </div>
+                </div>
+
+                <!-- MT -->
+                <div class="col-12 col-md-6 col-xl-4">
+                  <div class="border rounded bg-white p-2 shadow-sm nd-card-clickable" onclick="openNdFullscreen('MT')" title="คลิกเพื่อขยาย">
+                    <div class="text-center mb-1" style="font-size:0.8rem;font-weight:600;color:#9b5de5;">30m ท้าย (MT)</div>
+                    <div style="height:160px;" onclick="openNdFullscreen('MT')" title="คลิกเพื่อขยาย"><canvas id="ndBell-MT"></canvas></div>
+                    <hr class="my-1">
+                    <div style="height:90px;"><canvas id="ndScatter-MT"></canvas></div>
+                    <!-- μ/σ stats -->
+                    <div id="ndStats-MT" class="mt-1 px-1" style="font-size:0.72rem;line-height:1.6;"></div>
+                  </div>
+                </div>
+
+                <!-- T -->
+                <div class="col-12 col-md-6 col-xl-4">
+                  <div class="border rounded bg-white p-2 shadow-sm nd-card-clickable" onclick="openNdFullscreen('T')" title="คลิกเพื่อขยาย">
+                    <div class="text-center mb-1" style="font-size:0.8rem;font-weight:600;color:#d63384;">ท้ายม้วน (T)</div>
+                    <div style="height:160px;" onclick="openNdFullscreen('T')" title="คลิกเพื่อขยาย"><canvas id="ndBell-T"></canvas></div>
+                    <hr class="my-1">
+                    <div style="height:90px;"><canvas id="ndScatter-T"></canvas></div>
+                    <!-- μ/σ stats -->
+                    <div id="ndStats-T" class="mt-1 px-1" style="font-size:0.72rem;line-height:1.6;"></div>
+                  </div>
+                </div>
+
+              </div>
+              <!-- Legend -->
+              <div class="d-flex gap-3 mt-2 flex-wrap" style="font-size:0.78rem;">
+                <span><span style="display:inline-block;width:20px;height:3px;background:#3b82f6;vertical-align:middle;margin-right:4px;"></span>T1 ซ้าย</span>
+                <span><span style="display:inline-block;width:20px;height:3px;background:#10b981;vertical-align:middle;margin-right:4px;"></span>T2 กลาง</span>
+                <span><span style="display:inline-block;width:20px;height:3px;background:#f59e0b;vertical-align:middle;margin-right:4px;"></span>T3 ขวา</span>
+                <span><span style="display:inline-block;width:20px;height:2px;background:#ef4444;border-top:2px dashed #ef4444;vertical-align:middle;margin-right:4px;"></span>Spec (USL/LSL)</span>
+                <span><span style="display:inline-block;width:20px;height:2px;background:#6b7280;border-top:2px dashed #6b7280;vertical-align:middle;margin-right:4px;"></span>Mean</span>
+              </div>
+            </div>
             </div>
         </div>
       </div>
+
 
     </div>
 
@@ -2267,7 +2390,7 @@
       // ======================================================
       // ตั้งค่า URL ของ GAS Web App ที่นี่
       // ======================================================
-      const GAS_URL = "https://script.google.com/macros/s/AKfycbxgqHXHx-dxexgoQYYMqvHstqCWbXyrT3oMUzUxzuEX9g_96qyQMUlMvJw0zakDJEbQtA/exec";
+      const GAS_URL = "https://script.google.com/macros/s/AKfycbwcZesY-cNsIkfIIBhFIh4l1GHUyIo3rEKXjv2V3qCa594wqG7pve06I7mRrn74taoZ/exec";
 
       // Fix: aria-hidden บน focused element — blur ก่อน modal ซ่อน
       document.addEventListener('hide.bs.modal', function(e) {
@@ -2845,10 +2968,22 @@ function updateLegendDisplay(index, log) {
                 }
             }
 
+            // BUG FIX: compress รูปจาก #file-upload ก่อนส่ง (รองรับหลายรูป)
+            const fileUploadIn = document.getElementById('file-upload');
+            let filePayloads = [];
+            if (fileUploadIn && fileUploadIn.files.length > 0) {
+                try {
+                    const compressPromises = Array.from(fileUploadIn.files).map(f => compressImage(f));
+                    filePayloads = await Promise.all(compressPromises);
+                } catch (err) {
+                    console.error("Image compression error:", err);
+                }
+            }
+
             showLoading();
             btn.disabled = true;
 
-            callGAS('saveLogAndSlits', [fd, [], slitPayload], res => {
+            callGAS('saveLogAndSlits', [fd, filePayloads, slitPayload], res => {
                 hideLoading();
                 btn.disabled = false;
                 if (res.includes("SUCCESS")) {
@@ -3342,13 +3477,12 @@ function updateLegendDisplay(index, log) {
         function openAddJobModal() {
             const f = document.getElementById('add-job-form');
             f.reset();
-            f.newJobId.readOnly = false; // เปิดให้พิมพ์ Job ID ได้
+            resetSlitBuilder(); // BUG FIX: ล้าง slit rows เก่าที่ค้างจาก session ก่อนหน้า
+            f.newJobId.readOnly = false;
             document.getElementById('new-machine').value = CURRENT_MACHINE;
             
             const btn = document.getElementById('btn-add-job-save');
             btn.innerText = "สร้างแผนงานใหม่";
-            
-            // ล้างค่าพิเศษที่อาจค้างมาจากการกด "แก้ไข"
             f.dataset.mode = "ADD"; 
 
             new bootstrap.Modal(document.getElementById('modal-add-job')).show();
@@ -3363,7 +3497,8 @@ function updateLegendDisplay(index, log) {
             const originalText = btn.innerText;
             const fileIn = document.getElementById('new-job-file'); // ช่องเลือกรูปใบสั่ง
 
-            // 1. ดึงข้อมูลจากฟอร์ม
+            // 1. sync hidden input ก่อน FormData (BUG FIX: ป้องกันค่า Slit Plan ค้างเก่า)
+            updateSlitPreview();
             const fd = {};
             new FormData(f).forEach((v, k) => fd[k] = v);
 
@@ -3395,8 +3530,8 @@ function updateLegendDisplay(index, log) {
                     }
                 });
             } else {
-                // กรณีสร้างใหม่ (ADD) - แก้ไขจาก null เป็น filePayload
-                callGAS('addJob', [fd], res => {
+                // กรณีสร้างใหม่ (ADD) - BUG FIX: ใส่ filePayload เข้าไปใน args
+                callGAS('addJob', [fd, filePayload], res => {
                     btn.disabled = false; btn.innerText = originalText;
                     if (res === "SUCCESS") {
                         Swal.fire({ icon: 'success', title: 'สร้างแผนงานสำเร็จ', timer: 1500, showConfirmButton: false });
@@ -3725,6 +3860,9 @@ function updateLegendDisplay(index, log) {
                 // อัปเดตกล่องสถิติ Cp/Cpk
                 updateTrendStats(result);
 
+                // วาด Normal Distribution Charts
+                renderNormalDistCharts(points, spec);
+
                 if (!points || points.length === 0) {
                     if (trendChartInstance) trendChartInstance.destroy();
                     return Swal.fire("ไม่พบข้อมูล", "ไม่พบประวัติการผลิตที่ตรงกับเงื่อนไขการกรองของคุณ", "info");
@@ -3790,11 +3928,26 @@ function updateLegendDisplay(index, log) {
                             tooltip: {
                                 callbacks: {
                                     title: (ctx) => `Job: ${points[ctx[0].dataIndex].jobId}`,
-                                    afterBody: (ctx) => `Coil: ${points[ctx[0].dataIndex].coil}`
+                                    afterBody: (ctx) => {
+                                        const p = points[ctx[0].dataIndex];
+                                        return [
+                                            `Coil: ${p.coil || '-'}`,
+                                            `Mill: ${p.millNo || '-'}`
+                                        ];
+                                    }
                                 }
                             }
                         },
                         scales: {
+                            x: {
+                                ticks: {
+                                    // BUG FIX: autoSkip:false = แสดง label ทุก 45 จุด ไม่ซ่อน
+                                    autoSkip: false,
+                                    maxRotation: 60,
+                                    minRotation: 45,
+                                    font: { size: 9 }   // ตัวเล็กลงนิดเพื่อไม่ให้ชนกัน
+                                }
+                            },
                             y: { 
                                 title: { display: true, text: 'ความหนา (mm)' },
                                 // ปรับสเกลให้อัตโนมัติถ้าไม่มี Spec
@@ -4474,7 +4627,8 @@ function updateLegendDisplay(index, log) {
             f.newWorkType.value = job.workType;
             f.newThickness.value = job.thickness;
             f.newMill.value = job.millPlan;
-            if (job.stripWidth) f.newStripWidth.value = job.stripWidth;
+            // BUG FIX: ใช้ !== undefined แทน if(job.stripWidth) เพื่อรองรับค่า 0 ด้วย
+            if (job.stripWidth !== undefined) f.newStripWidth.value = job.stripWidth;
 
             // --- จุดสำคัญ: ดึงข้อมูล Slit Plan เก่ามาสร้างแถว ---
             if (job.slitPlan) {
@@ -5904,7 +6058,7 @@ function updateLegendDisplay(index, log) {
                 <div class="input-group input-group-sm" style="max-width: 110px;">
                     <input type="number" class="form-control fw-bold text-center slit-width-input"
                           placeholder="ขนาด" value="${defaultVal}"
-                          oninput="updateSlitPreview()" min="1" step="1">
+                          oninput="updateSlitPreview()" min="0.01" step="0.01">
                     <span class="input-group-text px-1" style="font-size:10px;">mm</span>
                 </div>
 
@@ -6028,98 +6182,413 @@ function updateLegendDisplay(index, log) {
             if (stripInput) stripInput.value = '';
         }
 
+    
+        // ============================================================
+        // Normal Distribution Charts
+        // รับ points[] จาก getAdvancedTrendData (มี tH1/tH2/tH3 ฯลฯ)
+        // วาด 5 กราฟ (H, HM, M, MT, T) แต่ละกราฟ 3 เส้น (T1/T2/T3)
+        // ============================================================
+        // ============================================================
+        // Normal Distribution — Bell Curve (บน) + Scatter (ล่าง)
+        // Bell: 3 เส้น T1/T2/T3 + เส้น Mean แต่ละเส้น + เส้น Spec USL/LSL
+        // Scatter: จุดดิบ T1/T2/T3 แยกสี + เส้น Mean + เส้น Spec
+        // ============================================================
+        const _ndBellInst = {}, _ndScatInst = {};
 
-        // ────────────────────────────────────────────
-        // THK PROFILE FAB
-        // ────────────────────────────────────────────
-        
-        // ✅ อยู่ repo เดียวกัน — ใช้ relative path ได้เลย
-        // ถ้าตั้งชื่อไฟล์ต่างออกไป ให้เปลี่ยน 'thk-profile.html' ให้ตรง
-        const THK_PROFILE_URL = './thk-profile.html';
-        
-        // แสดง/ซ่อน FAB ตามหน้าที่ active
-        // เรียกใช้ต่อจาก switchScreen() ที่มีอยู่แล้ว
-        (function patchSwitchScreen() {
-          const _orig = typeof switchScreen === 'function' ? switchScreen : null;
-          window.switchScreen = function(id) {
-            if (_orig) _orig(id);
-            // แสดง FAB ที่หน้า Home, Queue และ Running — ซ่อนเฉพาะ Dashboard
-            const showFab = (id === 'screen-select' || id === 'screen-queue' || id === 'screen-running');
-            document.getElementById('fab-thk').style.display = showFab ? 'block' : 'none';
-          };
-          // ตอน load: ถ้า screen-select active อยู่แล้ว ให้แสดง FAB เลย
-          if (document.getElementById('screen-select')?.classList.contains('active-screen')) {
-            document.getElementById('fab-thk').style.display = 'block';
-          }
-        })();
-        
-        // เปิด Thk Profile — ส่ง URL params จาก CURRENT_JOB_INFO ถ้ามี
-        function openThkProfile() {
-          const params = new URLSearchParams({ mode: 'new' });
-
-          if (CURRENT_JOB_INFO) {
-            if (CURRENT_JOB_INFO.jobId)
-              params.set('jobId', CURRENT_JOB_INFO.jobId);
-
-            if (CURRENT_JOB_INFO.thickness) {
-              params.set('target', CURRENT_JOB_INFO.thickness);
-
-              // ดึง spec max/min จาก ALL_DATA.standards
-              if (ALL_DATA && ALL_DATA.standards) {
-                const std = ALL_DATA.standards.find(
-                  s => Math.abs(Number(s.thick) - Number(CURRENT_JOB_INFO.thickness)) < 0.001
-                );
-                if (std) {
-                  if (std.max) params.set('max', std.max);
-                  if (std.min) params.set('min', std.min);
-                }
-              }
+        function renderNormalDistCharts(points, spec) {
+            if (!points || points.length === 0) {
+                document.getElementById('normal-dist-section').style.display = 'none';
+                return;
             }
-          }
+            document.getElementById('normal-dist-section').style.display = 'block';
+            // นับจำนวนแยกตาม Mill
+            const millCounts = {};
+            points.forEach(p => {
+                const m = p.millNo || 'N/A';
+                millCounts[m] = (millCounts[m] || 0) + 1;
+            });
+            const millBreakdown = Object.entries(millCounts)
+                .sort((a,b) => b[1]-a[1])
+                .map(([m,c]) => `${m}:${c}`)
+                .join(', ');
+            const millStr = millBreakdown ? ` (${millBreakdown})` : '';
+            document.getElementById('nd-sample-count').textContent = `n=${points.length}${millStr}`;
 
-          window.open(THK_PROFILE_URL + '?' + params.toString(), '_blank');
-        }      
+            const T_COLORS = { t1: '#3b82f6', t2: '#10b981', t3: '#f59e0b' };
+            const T_LABELS = { t1: 'T1 ซ้าย', t2: 'T2 กลาง', t3: 'T3 ขวา' };
+
+            const positions = [
+                { key:'H',  keys:['tH1','tH2','tH3'],   bellId:'ndBell-H',  scatId:'ndScatter-H',  statsId:'ndStats-H'  },
+                { key:'HM', keys:['tHM1','tHM2','tHM3'], bellId:'ndBell-HM', scatId:'ndScatter-HM', statsId:'ndStats-HM' },
+                { key:'M',  keys:['tM1','tM2','tM3'],   bellId:'ndBell-M',  scatId:'ndScatter-M',  statsId:'ndStats-M'  },
+                { key:'MT', keys:['tMT1','tMT2','tMT3'], bellId:'ndBell-MT', scatId:'ndScatter-MT', statsId:'ndStats-MT' },
+                { key:'T',  keys:['tT1','tT2','tT3'],   bellId:'ndBell-T',  scatId:'ndScatter-T',  statsId:'ndStats-T'  }
+            ];
+
+            function calcStats(arr) {
+                const n    = arr.length;
+                if (n === 0) return null;
+                const mean = arr.reduce((a,b)=>a+b,0)/n;
+                const std  = Math.sqrt(arr.map(v=>(v-mean)**2).reduce((a,b)=>a+b,0)/n);
+                return { mean, std, n };
+            }
+
+            function normPDF(x, mean, std) {
+                if (std === 0) return 0;
+                return (1/(std*Math.sqrt(2*Math.PI)))*Math.exp(-0.5*((x-mean)/std)**2);
+            }
+
+            positions.forEach(pos => {
+                const tKeys  = ['t1','t2','t3'];
+                const rawMap = {};                     // { t1: [v,...], t2: [...], t3: [...] }
+                const statsMap = {};                   // { t1: {mean,std}, ... }
+
+                tKeys.forEach((tk, i) => {
+                    rawMap[tk] = points.map(p => p[pos.keys[i]]).filter(v => v !== null && v > 0);
+                    statsMap[tk] = calcStats(rawMap[tk]);
+                });
+
+                const allVals = [...rawMap.t1, ...rawMap.t2, ...rawMap.t3];
+                if (allVals.length === 0) return;
+
+                const gMean = allVals.reduce((a,b)=>a+b,0)/allVals.length;
+                const gStd  = Math.sqrt(allVals.map(v=>(v-gMean)**2).reduce((a,b)=>a+b,0)/allVals.length);
+                const xMin  = Math.min(...allVals, spec&&spec.lsl?spec.lsl:Infinity) - gStd*0.5;
+                const xMax  = Math.max(...allVals, spec&&spec.usl?spec.usl:-Infinity) + gStd*0.5;
+                const xPts  = Array.from({length:200},(_,i)=>xMin+(xMax-xMin)*i/199);
+
+                // ── BELL CURVE ─────────────────────────────────────────────────
+                const bellDatasets = [];
+
+                tKeys.forEach(tk => {
+                    const st = statsMap[tk];
+                    if (!st || st.n < 2) return;
+                    bellDatasets.push({
+                        label: T_LABELS[tk],
+                        data: xPts.map(x=>({x, y:normPDF(x, st.mean, st.std)})),
+                        borderColor: T_COLORS[tk],
+                        backgroundColor: T_COLORS[tk]+'22',
+                        borderWidth: 2, pointRadius: 0, fill: true, tension: 0.4
+                    });
+                    // เส้น Mean ของแต่ละ T (แนวตั้ง)
+                    const yPeak = normPDF(st.mean, st.mean, st.std);
+                    bellDatasets.push({
+                        label: '_mean_'+tk,
+                        data: [{x:st.mean,y:0},{x:st.mean,y:yPeak}],
+                        borderColor: T_COLORS[tk], borderDash:[4,3],
+                        borderWidth:1.2, pointRadius:0, fill:false, tension:0
+                    });
+                });
+
+                // เส้น Spec USL/LSL
+                if (spec && spec.usl !== null) {
+                    const yMax = Math.max(...bellDatasets.filter(d=>!d.label.startsWith('_'))
+                                         .flatMap(d=>d.data.map(p=>p.y))) * 1.15;
+                    [['USL',spec.usl],['LSL',spec.lsl]].forEach(([lbl,val])=>{
+                        bellDatasets.push({
+                            label: lbl+'='+val,
+                            data: [{x:val,y:0},{x:val,y:yMax}],
+                            borderColor:'#ef4444', borderDash:[6,4],
+                            borderWidth:1.5, pointRadius:0, fill:false, tension:0
+                        });
+                    });
+                }
+
+                // ── แสดงค่า μ และ σ ───────────────────────────────────────
+                const statsEl = document.getElementById(pos.statsId);
+                if (statsEl) {
+                    const rows = tKeys.map(tk => {
+                        const st = statsMap[tk];
+                        if (!st || st.n < 2) return '';
+                        const color = T_COLORS[tk];
+                        return `<span style="color:${color};font-weight:600;">${T_LABELS[tk]}</span>` +
+                               `&nbsp; μ=<b>${st.mean.toFixed(3)}</b>&nbsp; σ=<b>${st.std.toFixed(3)}</b>&nbsp; n=${st.n}`;
+                    }).filter(Boolean);
+                    statsEl.innerHTML = rows.join('<br>');
+                }
+
+                if (_ndBellInst[pos.key]) _ndBellInst[pos.key].destroy();
+                const bellCtx = document.getElementById(pos.bellId).getContext('2d');
+                _ndBellInst[pos.key] = new Chart(bellCtx, {
+                    type: 'line',
+                    data: { datasets: bellDatasets },
+                    options: {
+                        responsive:true, maintainAspectRatio:false, parsing:false,
+                        animation: false,
+                        plugins: {
+                            legend: {
+                                display: true, position:'bottom',
+                                labels: {
+                                    boxWidth:10, font:{size:8},
+                                    filter: item => !item.text.startsWith('_')
+                                }
+                            },
+                            tooltip: { filter: item => !item.dataset.label.startsWith('_') }
+                        },
+                        scales: {
+                            x: { type:'linear',
+                                 ticks:{font:{size:8},maxTicksLimit:7,callback:v=>v.toFixed(2)},
+                                 title:{display:false} },
+                            y: { ticks:{font:{size:8},maxTicksLimit:4,callback:v=>v.toFixed(1)},
+                                 title:{display:true,text:'ความหนาแน่น',font:{size:8}} }
+                        }
+                    }
+                });
+
+                // ── SCATTER PLOT ──────────────────────────────────────────────
+                const scatDatasets = [];
+
+                tKeys.forEach((tk, ti) => {
+                    if (rawMap[tk].length === 0) return;
+                    // jitter แกน Y แบบ strip chart เพื่อไม่ให้จุดทับกัน
+                    scatDatasets.push({
+                        label: T_LABELS[tk],
+                        data: rawMap[tk].map(v => ({
+                            x: v,
+                            y: ti + (Math.random()-0.5)*0.5   // jitter ± 0.25 รอบแถว ti
+                        })),
+                        backgroundColor: T_COLORS[tk]+'bb',
+                        borderColor: T_COLORS[tk],
+                        borderWidth:0.5, pointRadius:4, pointStyle:'circle'
+                    });
+                    // เส้น Mean แนวตั้งใน scatter
+                    const st = statsMap[tk];
+                    if (st) {
+                        scatDatasets.push({
+                            label: '_mean_'+tk,
+                            data: [{x:st.mean,y:ti-0.4},{x:st.mean,y:ti+0.4}],
+                            borderColor: T_COLORS[tk], borderDash:[4,3],
+                            borderWidth:2, pointRadius:0, fill:false,
+                            type:'line', tension:0
+                        });
+                    }
+                });
+
+                // เส้น Spec ใน Scatter
+                if (spec && spec.usl !== null) {
+                    [['USL',spec.usl],['LSL',spec.lsl]].forEach(([lbl,val])=>{
+                        scatDatasets.push({
+                            label: lbl,
+                            data: [{x:val,y:-0.6},{x:val,y:2.6}],
+                            borderColor:'#ef4444', borderDash:[6,4],
+                            borderWidth:1.5, pointRadius:0, fill:false,
+                            type:'line', tension:0
+                        });
+                    });
+                }
+
+                if (_ndScatInst[pos.key]) _ndScatInst[pos.key].destroy();
+                const scatCtx = document.getElementById(pos.scatId).getContext('2d');
+                _ndScatInst[pos.key] = new Chart(scatCtx, {
+                    type: 'scatter',
+                    data: { datasets: scatDatasets },
+                    options: {
+                        responsive:true, maintainAspectRatio:false,
+                        animation: false,
+                        plugins: {
+                            legend: { display:false },
+                            tooltip: {
+                                filter: item => !item.dataset.label.startsWith('_'),
+                                callbacks: { label: ctx=>`${ctx.dataset.label}: ${ctx.parsed.x.toFixed(3)} mm` }
+                            }
+                        },
+                        scales: {
+                            x: { type:'linear', min:xMin, max:xMax,
+                                 ticks:{font:{size:8},maxTicksLimit:7,callback:v=>v.toFixed(2)},
+                                 title:{display:false} },
+                            y: { min:-0.7, max:2.7, display:false }
+                        }
+                    }
+                });
+            });
+        }
+
+    
+        // ── ND Fullscreen ──────────────────────────────────────────────────────
+        let _ndFullBellInst = null, _ndFullScatInst = null;
+        let _ndLastPoints = null, _ndLastSpec = null;
+
+        // เก็บ points/spec ทุกครั้งที่ render
+        const _origRenderND = renderNormalDistCharts;
+        renderNormalDistCharts = function(points, spec) {
+            _ndLastPoints = points;
+            _ndLastSpec   = spec;
+            _origRenderND(points, spec);
+        };
+
+        const ND_META = {
+            H:  { keys:['tH1','tH2','tH3'],   label:'ต้นม้วน (H)',  color:'#fd7e14' },
+            HM: { keys:['tHM1','tHM2','tHM3'], label:'30m แรก (HM)', color:'#ffc107' },
+            M:  { keys:['tM1','tM2','tM3'],    label:'กลางม้วน (M)', color:'#4361ee' },
+            MT: { keys:['tMT1','tMT2','tMT3'], label:'30m ท้าย (MT)',color:'#9b5de5' },
+            T:  { keys:['tT1','tT2','tT3'],    label:'ท้ายม้วน (T)', color:'#d63384' }
+        };
+
+        function openNdFullscreen(posKey) {
+            if (!_ndLastPoints || _ndLastPoints.length === 0) return;
+
+            const meta   = ND_META[posKey];
+            const points = _ndLastPoints;
+            const spec   = _ndLastSpec;
+            const T_COLORS = { t1:'#3b82f6', t2:'#10b981', t3:'#f59e0b' };
+            const T_LABELS = { t1:'T1 ซ้าย', t2:'T2 กลาง', t3:'T3 ขวา' };
+            const tKeys    = ['t1','t2','t3'];
+
+            // แสดง overlay
+            document.getElementById('nd-fullscreen-title').innerHTML =
+                `<span style="color:${meta.color}">${meta.label}</span> &nbsp;—&nbsp; n=${points.length}`;
+            document.getElementById('nd-fullscreen-overlay').classList.add('active');
+            document.body.style.overflow = 'hidden';
+
+            const rawMap = {}, statsMap = {};
+            tKeys.forEach((tk, i) => {
+                rawMap[tk]   = points.map(p => p[meta.keys[i]]).filter(v => v !== null && v > 0);
+                const arr    = rawMap[tk];
+                const n      = arr.length;
+                if (n < 2) { statsMap[tk] = null; return; }
+                const mean   = arr.reduce((a,b)=>a+b,0)/n;
+                const std    = Math.sqrt(arr.map(v=>(v-mean)**2).reduce((a,b)=>a+b,0)/n);
+                statsMap[tk] = { mean, std, n };
+            });
+
+            const allVals = [...rawMap.t1,...rawMap.t2,...rawMap.t3];
+            if (!allVals.length) return;
+            const gMean = allVals.reduce((a,b)=>a+b,0)/allVals.length;
+            const gStd  = Math.sqrt(allVals.map(v=>(v-gMean)**2).reduce((a,b)=>a+b,0)/allVals.length);
+            const xMin  = Math.min(...allVals, spec&&spec.lsl?spec.lsl:Infinity) - gStd*0.5;
+            const xMax  = Math.max(...allVals, spec&&spec.usl?spec.usl:-Infinity) + gStd*0.5;
+            const xPts  = Array.from({length:300},(_,i)=>xMin+(xMax-xMin)*i/299);
+
+            function normPDF(x,mean,std){ return std===0?0:(1/(std*Math.sqrt(2*Math.PI)))*Math.exp(-0.5*((x-mean)/std)**2); }
+
+            // ── Bell Chart ────────────────────────────────────────────────────
+            const bellDs = [];
+            tKeys.forEach(tk => {
+                const st = statsMap[tk];
+                if (!st) return;
+                bellDs.push({
+                    label: T_LABELS[tk],
+                    data: xPts.map(x=>({x,y:normPDF(x,st.mean,st.std)})),
+                    borderColor: T_COLORS[tk], backgroundColor: T_COLORS[tk]+'22',
+                    borderWidth:2.5, pointRadius:0, fill:true, tension:0.4
+                });
+                const yPeak = normPDF(st.mean,st.mean,st.std);
+                bellDs.push({
+                    label:'_mean_'+tk,
+                    data:[{x:st.mean,y:0},{x:st.mean,y:yPeak}],
+                    borderColor:T_COLORS[tk], borderDash:[5,4],
+                    borderWidth:1.5, pointRadius:0, fill:false, tension:0
+                });
+            });
+            if (spec&&spec.usl!==null) {
+                const yMax = Math.max(...bellDs.filter(d=>!d.label.startsWith('_')).flatMap(d=>d.data.map(p=>p.y)))*1.15;
+                [['USL',spec.usl],['LSL',spec.lsl]].forEach(([lbl,val])=>{
+                    bellDs.push({ label:`${lbl} (${val})`,
+                        data:[{x:val,y:0},{x:val,y:yMax}],
+                        borderColor:'#ef4444', borderDash:[7,4],
+                        borderWidth:2, pointRadius:0, fill:false, tension:0 });
+                });
+            }
+            if (_ndFullBellInst) _ndFullBellInst.destroy();
+            _ndFullBellInst = new Chart(document.getElementById('ndBell-full').getContext('2d'), {
+                type:'line', data:{datasets:bellDs},
+                options:{
+                    responsive:true, maintainAspectRatio:false, parsing:false, animation:false,
+                    plugins:{
+                        legend:{ display:true, position:'bottom',
+                            labels:{ boxWidth:12, font:{size:11},
+                                filter: item=>!item.text.startsWith('_') }},
+                        tooltip:{ filter: item=>!item.dataset.label.startsWith('_') }
+                    },
+                    scales:{
+                        x:{ type:'linear', ticks:{font:{size:11},maxTicksLimit:10,callback:v=>v.toFixed(3)},
+                            title:{display:true,text:'ความหนา (mm)',font:{size:11}} },
+                        y:{ ticks:{font:{size:11},maxTicksLimit:6,callback:v=>v.toFixed(2)},
+                            title:{display:true,text:'ความหนาแน่น',font:{size:11}} }
+                    }
+                }
+            });
+
+            // ── Scatter Chart ─────────────────────────────────────────────────
+            const scatDs = [];
+            tKeys.forEach((tk,ti) => {
+                if (!rawMap[tk].length) return;
+                scatDs.push({
+                    label: T_LABELS[tk],
+                    data: rawMap[tk].map(v=>({x:v, y:ti+(Math.random()-0.5)*0.5})),
+                    backgroundColor: T_COLORS[tk]+'cc',
+                    borderColor: T_COLORS[tk],
+                    borderWidth:0.5, pointRadius:5, pointStyle:'circle'
+                });
+                const st = statsMap[tk];
+                if (st) scatDs.push({ label:'_mean_'+tk,
+                    data:[{x:st.mean,y:ti-0.45},{x:st.mean,y:ti+0.45}],
+                    borderColor:T_COLORS[tk], borderDash:[5,3],
+                    borderWidth:2.5, pointRadius:0, fill:false, type:'line', tension:0 });
+            });
+            if (spec&&spec.usl!==null) {
+                [['USL',spec.usl],['LSL',spec.lsl]].forEach(([lbl,val])=>{
+                    scatDs.push({ label:lbl,
+                        data:[{x:val,y:-0.6},{x:val,y:2.6}],
+                        borderColor:'#ef4444', borderDash:[7,4],
+                        borderWidth:2, pointRadius:0, fill:false, type:'line', tension:0 });
+                });
+            }
+            if (_ndFullScatInst) _ndFullScatInst.destroy();
+            _ndFullScatInst = new Chart(document.getElementById('ndScatter-full').getContext('2d'), {
+                type:'scatter', data:{datasets:scatDs},
+                options:{
+                    responsive:true, maintainAspectRatio:false, animation:false,
+                    plugins:{
+                        legend:{display:false},
+                        tooltip:{ filter:item=>!item.dataset.label.startsWith('_'),
+                            callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.parsed.x.toFixed(3)} mm`} }
+                    },
+                    scales:{
+                        x:{type:'linear', min:xMin, max:xMax,
+                           ticks:{font:{size:11},maxTicksLimit:10,callback:v=>v.toFixed(3)},
+                           title:{display:true,text:'ความหนา (mm)',font:{size:11}}},
+                        y:{min:-0.7, max:2.7, display:false}
+                    }
+                }
+            });
+
+            // ── Stats ──────────────────────────────────────────────────────────
+            const statsEl = document.getElementById('ndStats-full');
+            statsEl.innerHTML = tKeys.map(tk => {
+                const st = statsMap[tk];
+                if (!st) return '';
+                return `<span style="color:${T_COLORS[tk]};font-weight:600;">${T_LABELS[tk]}</span>` +
+                       `&nbsp;&nbsp; μ = <b>${st.mean.toFixed(4)}</b> &nbsp; σ = <b>${st.std.toFixed(4)}</b> &nbsp; n = ${st.n}`;
+            }).filter(Boolean).join('<br>');
+        }
+
+        function closeNdFullscreen(event, force) {
+            if (!force && event && event.target !== document.getElementById('nd-fullscreen-overlay')) return;
+            document.getElementById('nd-fullscreen-overlay').classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // ปิดด้วย Escape key
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') closeNdFullscreen(null, true);
+        });
 
     </script>
 
     <div id="toast-container" style="position:fixed; top:20px; right:20px; z-index:10000;"></div>
-    
-<!-- ── FAB: Thickness Profile ── -->
-<div id="fab-thk" style="
-  display: none;
-  position: fixed;
-  bottom: 24px;
-  right: 20px;
-  z-index: 1000;
-">
-  <button onclick="openThkProfile()"
-    title="วัดความหนาม้วน"
-    style="
-      background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 100%);
-      color: white;
-      border: none;
-      border-radius: 50px;
-      padding: 13px 20px;
-      font-family: 'Sarabun', sans-serif;
-      font-weight: 700;
-      font-size: 14px;
-      cursor: pointer;
-      box-shadow: 0 6px 20px rgba(99,102,241,0.45);
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      transition: transform 0.15s, box-shadow 0.15s;
-      white-space: nowrap;
-    "
-    onmousedown="this.style.transform='scale(0.96)'"
-    onmouseup="this.style.transform='scale(1)'"
-    ontouchstart="this.style.transform='scale(0.96)'"
-    ontouchend="this.style.transform='scale(1)'"
-  >
-    <span style="font-size:17px;">📏</span> วัดความหนา
-  </button>
+
+  
+<!-- ND Fullscreen Overlay -->
+<div id="nd-fullscreen-overlay" onclick="closeNdFullscreen(event)">
+  <div id="nd-fullscreen-inner">
+    <button id="nd-fullscreen-close" onclick="closeNdFullscreen(null, true)">✕</button>
+    <div id="nd-fullscreen-title" class="text-center fw-bold mb-2" style="font-size:1rem;"></div>
+    <div style="height:55vh;"><canvas id="ndBell-full"></canvas></div>
+    <hr class="my-2">
+    <div style="height:20vh;"><canvas id="ndScatter-full"></canvas></div>
+    <div id="ndStats-full" class="mt-2 px-1" style="font-size:0.82rem;line-height:1.8;"></div>
+  </div>
 </div>
-
-  </body>
+</body>
 </html>
-
